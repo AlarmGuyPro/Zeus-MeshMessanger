@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "meshmessenger.mesh": {
+        "type": "Project"
+      },
+      "Zeussdr.Zeus.Plugins.Contracts": {
+        "type": "Project"
+      }
+    }
+  }
+}

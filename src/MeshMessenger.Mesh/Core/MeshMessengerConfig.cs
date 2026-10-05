@@ -14,6 +14,9 @@ public sealed class MeshMessengerConfig
     /// (<c>192.168.30.0/24</c>) or start-end. See docs/DISCOVERY.md.
     /// </summary>
     public List<string> ScanRanges { get; set; } = [];
+
+    /// <summary>Messages kept per conversation across restarts.</summary>
+    public int HistoryPerConversation { get; set; } = 500;
 }
 
 public sealed class NodeConfig

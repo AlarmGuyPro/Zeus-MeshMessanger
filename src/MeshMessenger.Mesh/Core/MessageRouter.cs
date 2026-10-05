@@ -12,25 +12,39 @@ namespace MeshMessenger.Core;
 /// is no fallback to another connector, ever.</item>
 /// <item>Only a new conversation names its connector, explicitly.</item>
 /// <item>Inbound messages whose key names a different connector are dropped.</item>
+/// <item>Every transmission goes through the shared <see cref="TransmitCoordinator"/>.</item>
 /// </list>
 /// </summary>
-public sealed class MessageRouter
+public sealed class MessageRouter : IDisposable
 {
     private readonly MessageStore _store;
+    private readonly TransmitCoordinator _tx;
     private readonly IReadOnlyDictionary<string, IMeshConnector> _connectors;
+    private readonly List<Action> _unsubscribe = [];
 
-    public MessageRouter(MessageStore store, IEnumerable<IMeshConnector> connectors)
+    public MessageRouter(MessageStore store, TransmitCoordinator tx, IEnumerable<IMeshConnector> connectors)
     {
         _store = store;
+        _tx = tx;
         _connectors = connectors.ToDictionary(c => c.Id, StringComparer.Ordinal);
         foreach (var connector in _connectors.Values)
         {
             var source = connector;
-            connector.MessageReceived += message => OnInbound(source, message);
+            Action<InboundMessage> onMessage = message => OnInbound(source, message);
+            Action<DeliveryUpdate> onDelivery = update => OnDelivery(source, update);
+            connector.MessageReceived += onMessage;
+            connector.DeliveryChanged += onDelivery;
+            _unsubscribe.Add(() =>
+            {
+                connector.MessageReceived -= onMessage;
+                connector.DeliveryChanged -= onDelivery;
+            });
         }
     }
 
     public IReadOnlyCollection<IMeshConnector> Connectors => _connectors.Values.ToArray();
+
+    public IMeshConnector? Connector(string id) => _connectors.TryGetValue(id, out var c) ? c : null;
 
     public sealed record RouteResult(bool Ok, string? Error, string? ConversationId, StoredMessage? Message)
     {
@@ -45,7 +59,7 @@ public sealed class MessageRouter
         {
             return RouteResult.Fail("Conversation not found.");
         }
-        return await SendOnOwnConnectorAsync(conversation.Key, text, ct);
+        return await SendOnOwnConnectorAsync(conversation.Key, text, ct).ConfigureAwait(false);
     }
 
     /// <summary>Start a conversation. The caller must name the connector explicitly.</summary>
@@ -60,17 +74,37 @@ public sealed class MessageRouter
             return RouteResult.Fail("A channel or destination is required.");
         }
         var key = new ConversationKey(connector.Id, kind, peer.Trim());
-        _store.GetOrAdd(key, connector.Network, title: null);
-        return await SendOnOwnConnectorAsync(key, text, ct);
+        var check = Validate(connector, key, text.Trim());
+        if (check is not null)
+        {
+            return RouteResult.Fail(check);
+        }
+        _store.GetOrAdd(key, connector.Network, connector.TitleFor(key));
+        return await SendOnOwnConnectorAsync(key, text, ct).ConfigureAwait(false);
+    }
+
+    private static string? Validate(IMeshConnector connector, ConversationKey key, string text)
+    {
+        if (text.Length == 0)
+        {
+            return "Message is empty.";
+        }
+        if (connector.State != ConnectorState.Connected)
+        {
+            return $"{connector.DisplayName} is not connected. The message was not sent.";
+        }
+        var bytes = Encoding.UTF8.GetByteCount(text);
+        var limit = connector.MaxTextBytes(key.Kind);
+        if (bytes > limit)
+        {
+            return $"Message is {bytes} bytes; {connector.DisplayName} allows {limit} here.";
+        }
+        return null;
     }
 
     private async Task<RouteResult> SendOnOwnConnectorAsync(ConversationKey key, string text, CancellationToken ct)
     {
         text = text.Trim();
-        if (text.Length == 0)
-        {
-            return RouteResult.Fail("Message is empty.", key.Id);
-        }
 
         // The connector is looked up from the key, never chosen by the caller.
         if (!_connectors.TryGetValue(key.ConnectorId, out var connector))
@@ -79,38 +113,75 @@ public sealed class MessageRouter
                 $"The node this conversation belongs to ('{key.ConnectorId}') is no longer configured. Messages are never re-sent on another node.",
                 key.Id);
         }
-        if (connector.State != ConnectorState.Connected)
+        var problem = Validate(connector, key, text);
+        if (problem is not null)
         {
-            return RouteResult.Fail($"{connector.DisplayName} is not connected. The message was not sent.", key.Id);
+            return RouteResult.Fail(problem, key.Id);
         }
-        var bytes = Encoding.UTF8.GetByteCount(text);
-        var limit = connector.MaxTextBytes(key.Kind);
-        if (bytes > limit)
-        {
-            return RouteResult.Fail($"Message is {bytes} bytes; {connector.DisplayName} allows {limit} here.", key.Id);
-        }
+
+        var id = Guid.NewGuid().ToString("N");
+        var pending = new StoredMessage(
+            Id: id,
+            Direction: MessageDirection.Outbound,
+            FromId: connector.Self?.Identity ?? connector.Id,
+            FromName: connector.Self?.Name ?? connector.DisplayName,
+            Text: text,
+            Timestamp: DateTimeOffset.UtcNow,
+            Status: DeliveryStatus.Sending,
+            Error: null);
+        _store.Append(key, pending);
 
         SendResult result;
         try
         {
-            result = await connector.SendAsync(key, text, ct);
+            result = await _tx.RunAsync(token => connector.SendAsync(key, text, token), ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            result = SendResult.Failure("Cancelled before it was sent.");
+        }
+        catch (Exception ex)
         {
             result = SendResult.Failure(ex.Message);
         }
 
-        var stored = new StoredMessage(
-            Id: Guid.NewGuid().ToString("N"),
-            Direction: MessageDirection.Outbound,
-            FromId: connector.Id,
-            FromName: connector.DisplayName,
-            Text: text,
-            Timestamp: DateTimeOffset.UtcNow,
-            Status: result.Ok ? DeliveryStatus.Sent : DeliveryStatus.Failed,
-            Error: result.Error);
-        _store.Append(key, stored);
-        return new RouteResult(result.Ok, result.Error, key.Id, stored);
+        var final = pending with
+        {
+            Status = result.Ok ? DeliveryStatus.Sent : DeliveryStatus.Failed,
+            Error = result.Error,
+            AckTag = result.AckTag,
+            Flood = result.Flood,
+        };
+        _store.Replace(key, final);
+        ApplyEarly(connector.Id, result.AckTag);
+        return new RouteResult(result.Ok, result.Error, key.Id, final);
+    }
+
+    // An ack can, in principle, arrive before SendAsync has returned the tag
+    // to us. Such early updates are parked briefly and applied once the
+    // outbound message carries its tag.
+    private readonly Dictionary<string, (DeliveryUpdate Update, DateTimeOffset At)> _early = new(StringComparer.Ordinal);
+
+    private void OnDelivery(IMeshConnector source, DeliveryUpdate update)
+    {
+        if (_store.UpdateDelivery(source.Id, update.AckTag, update.Status, update.Error, update.RoundTripMs)) return;
+        lock (_early)
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddMinutes(-2);
+            foreach (var stale in _early.Where(kv => kv.Value.At < cutoff).Select(kv => kv.Key).ToList()) _early.Remove(stale);
+            _early[$"{source.Id}|{update.AckTag}"] = (update, DateTimeOffset.UtcNow);
+        }
+    }
+
+    private void ApplyEarly(string connectorId, string? ackTag)
+    {
+        if (ackTag is null) return;
+        DeliveryUpdate? update = null;
+        lock (_early)
+        {
+            if (_early.Remove($"{connectorId}|{ackTag}", out var parked)) update = parked.Update;
+        }
+        if (update is not null) _store.UpdateDelivery(connectorId, ackTag, update.Status, update.Error, update.RoundTripMs);
     }
 
     private void OnInbound(IMeshConnector source, InboundMessage message)
@@ -120,15 +191,29 @@ public sealed class MessageRouter
         {
             return;
         }
-        _store.GetOrAdd(message.Conversation, source.Network, title: null);
+        if (message.NetworkMessageId is not null &&
+            _store.HasNetworkMessage(message.Conversation, message.NetworkMessageId, message.FromId))
+        {
+            return; // the same packet heard twice
+        }
+        _store.GetOrAdd(message.Conversation, source.Network, source.TitleFor(message.Conversation));
         _store.Append(message.Conversation, new StoredMessage(
             Id: Guid.NewGuid().ToString("N"),
             Direction: MessageDirection.Inbound,
             FromId: message.FromId,
             FromName: message.FromName,
             Text: message.Text,
-            Timestamp: message.ReceivedAt,
+            Timestamp: message.SentAt,
             Status: DeliveryStatus.Received,
-            Error: null));
+            Error: null,
+            Reception: message.Reception,
+            QueuedWhileAway: message.QueuedWhileAway,
+            NetworkId: message.NetworkMessageId));
+    }
+
+    public void Dispose()
+    {
+        foreach (var unsubscribe in _unsubscribe) unsubscribe();
+        _unsubscribe.Clear();
     }
 }
