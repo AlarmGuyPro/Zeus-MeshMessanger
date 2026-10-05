@@ -11,6 +11,13 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../sdk/Zeussdr.Zeus.Plugins.Contracts/Zeus.Plugins.Contracts.csproj"
                       Private="false" />
-    <ProjectReference Include="../MeshMessenger.Mesh/MeshMessenger.Mesh.csproj" />
+  </ItemGroup>
+  <!-- The mesh library is compiled into the plugin so the package ships one
+       assembly (the catalog scan asks reviewers to check every extra DLL).
+       MeshMessenger.Mesh.csproj still builds it alone for the future gateway. -->
+  <ItemGroup>
+    <Compile Include="../MeshMessenger.Mesh/**/*.cs"
+             Exclude="../MeshMessenger.Mesh/bin/**;../MeshMessenger.Mesh/obj/**"
+             LinkBase="Mesh" />
   </ItemGroup>
 </Project>

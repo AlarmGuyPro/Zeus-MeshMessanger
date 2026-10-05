@@ -15,7 +15,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../src/MeshMessenger/MeshMessenger.csproj" />
-    <ProjectReference Include="../../src/MeshMessenger.Mesh/MeshMessenger.Mesh.csproj" />
     <ProjectReference Include="../../sdk/Zeussdr.Zeus.Plugins.Contracts/Zeus.Plugins.Contracts.csproj" />
   </ItemGroup>
 </Project>
