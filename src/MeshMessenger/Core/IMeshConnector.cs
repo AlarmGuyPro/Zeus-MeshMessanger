@@ -20,8 +20,11 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Human-readable reason for the current state, e.g. the last error.</summary>
     string? StateDetail { get; }
 
-    /// <summary>Largest UTF-8 payload the protocol accepts for one text message.</summary>
-    int MaxTextBytes { get; }
+    /// <summary>
+    /// Largest UTF-8 text the node will send intact for this kind of conversation.
+    /// Can differ by kind (MeshCore prefixes channel text with our node name).
+    /// </summary>
+    int MaxTextBytes(ConversationKind kind);
 
     /// <summary>Raised for every text message the node delivers. Keys must carry this connector's <see cref="Id"/>.</summary>
     event Action<InboundMessage>? MessageReceived;

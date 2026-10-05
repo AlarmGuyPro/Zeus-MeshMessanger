@@ -31,8 +31,12 @@ the Zeus computer:
 
 - **Meshtastic:** enable Wi-Fi in the node's network settings. Zeus connects to
   TCP port 4403.
-- **MeshCore:** use a companion-radio Wi-Fi build. Zeus connects to its TCP
-  port (5000 by default).
+- **MeshCore:** use the companion-radio Wi-Fi build for your board (for the
+  Heltec V4: `heltec_v4_companion_radio_wifi`). MeshCore's Wi-Fi network name
+  and password are set when the firmware is built, so you need a build made
+  with your network's details. Zeus connects to TCP port 5000. A MeshCore node
+  talks to one app at a time: connecting the phone app or meshcore-cli over
+  Wi-Fi disconnects Zeus until you close them.
 
 Give the node a fixed IP address (a DHCP reservation in your router) so Zeus
 can find it after a restart.

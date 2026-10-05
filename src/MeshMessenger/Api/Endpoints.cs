@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Routing;
 namespace MeshMessenger.Api;
 
 // Wire shapes. Enums are sent as lowercase strings so the panel never depends on enum ordering.
-public sealed record NodeDto(string Id, string Network, string Name, string State, string? Detail, int MaxTextBytes);
+public sealed record NodeDto(
+    string Id, string Network, string Name, string State, string? Detail,
+    int MaxDirectTextBytes, int MaxChannelTextBytes);
 
 public sealed record ConversationDto(
     string Id, string ConnectorId, string Network, string Kind, string Peer, string? Title,
@@ -109,7 +111,8 @@ internal static class Endpoints
     private static string Lower<T>(T value) where T : struct, Enum => value.ToString().ToLowerInvariant();
 
     private static NodeDto NodeToDto(IMeshConnector c) =>
-        new(c.Id, Lower(c.Network), c.DisplayName, Lower(c.State), c.StateDetail, c.MaxTextBytes);
+        new(c.Id, Lower(c.Network), c.DisplayName, Lower(c.State), c.StateDetail,
+            c.MaxTextBytes(ConversationKind.Direct), c.MaxTextBytes(ConversationKind.Channel));
 
     private static ConversationDto ConversationToDto(MessageStore.Summary s) =>
         new(s.Conversation.Key.Id, s.Conversation.Key.ConnectorId, Lower(s.Conversation.Network),

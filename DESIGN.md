@@ -11,10 +11,14 @@ Feature ID (permanent): `io.github.alarmguypro.meshmessenger`
 One feature, one panel, one unified inbox, and one **connector** per
 configured node. A connector speaks exactly one protocol:
 
-| Connector | Transport (planned) | Text limit |
+| Connector | Transport | Text limit |
 |---|---|---|
-| Meshtastic | Firmware TCP API, port 4403, framed protobuf `ToRadio`/`FromRadio` | 200 bytes (verify) |
-| MeshCore | Companion-radio Wi-Fi firmware, TCP (port 5000 by default; verify), companion frame protocol | 160 bytes (verify) |
+| Meshtastic | Firmware TCP API, port 4403, framed protobuf `ToRadio`/`FromRadio` | 200 bytes (protocol max 233) |
+| MeshCore | Companion-radio Wi-Fi firmware, TCP port 5000, companion frame protocol | DM 160 bytes; channel 160 − (our node name + 2) bytes |
+
+Protocol references, with upstream commits: [docs/protocols/meshtastic.md](docs/protocols/meshtastic.md),
+[docs/protocols/meshcore.md](docs/protocols/meshcore.md). Feature scope:
+[docs/FEATURES.md](docs/FEATURES.md).
 
 The operator can configure zero, one or several nodes of either type
 (typically one of each).
@@ -109,6 +113,15 @@ flagged by the catalog's security scan.
   into the panel's fields are stopped from reaching host hotkeys (Space is
   transmit in Zeus).
 
+## Connection etiquette
+
+- **MeshCore nodes accept one TCP client at a time** and drop the old one
+  when a new one connects. The connector reconnects with backoff and reports
+  "another client took the node" instead of fighting the operator's phone or
+  meshcore-cli.
+- Anything that transmits beyond a message (traceroute, path discovery,
+  trace, advert) only happens on an explicit operator action, with a cooldown.
+
 ## Milestones
 
 1. **Scaffold** (this commit): routing core, in-memory store, endpoints,
@@ -116,7 +129,7 @@ flagged by the catalog's security scan.
 2. **Node configuration**: `GET/PUT config` endpoints and a settings view in the
    panel (add/edit/remove nodes; host, port, network, name). Restart connectors
    on change.
-3. **Meshtastic connector**: TCP framing, `want_config` handshake, node DB for
+3. **Meshtastic connector** (then the tools in docs/FEATURES.md, tier by tier): TCP framing, `want_config` handshake, node DB for
    names, text send/receive on channels and DMs, reconnect with backoff.
 4. **MeshCore connector**: companion TCP framing, app start / contact sync,
    channel and contact messages, reconnect with backoff.
@@ -126,7 +139,6 @@ flagged by the catalog's security scan.
 
 ## Open questions
 
-- Confirm both text limits and the MeshCore TCP port against current firmware.
 - Test project: the rebuild check lints every `.csproj` in the repo, and xUnit
   packages ship MSBuild targets. Ask the Zeus maintainers whether a test
   project is fine as long as it isn't the `dotnet.project`, or keep tests out

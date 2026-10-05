@@ -18,7 +18,7 @@ public abstract class MeshConnectorBase(NodeConfig config) : IMeshConnector
 
     public string? StateDetail { get; private set; }
 
-    public abstract int MaxTextBytes { get; }
+    public abstract int MaxTextBytes(ConversationKind kind);
 
     public event Action<InboundMessage>? MessageReceived;
 

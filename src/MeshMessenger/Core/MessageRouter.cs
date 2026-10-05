@@ -84,9 +84,10 @@ public sealed class MessageRouter
             return RouteResult.Fail($"{connector.DisplayName} is not connected. The message was not sent.", key.Id);
         }
         var bytes = Encoding.UTF8.GetByteCount(text);
-        if (bytes > connector.MaxTextBytes)
+        var limit = connector.MaxTextBytes(key.Kind);
+        if (bytes > limit)
         {
-            return RouteResult.Fail($"Message is {bytes} bytes; {connector.Network} allows {connector.MaxTextBytes}.", key.Id);
+            return RouteResult.Fail($"Message is {bytes} bytes; {connector.DisplayName} allows {limit} here.", key.Id);
         }
 
         SendResult result;

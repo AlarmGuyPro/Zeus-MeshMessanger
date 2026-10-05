@@ -4,6 +4,7 @@ import type { KeyboardEvent } from "react";
 import {
   networkLabel,
   networkShort,
+  textLimit,
   utf8Length,
   type Client,
   type ConversationDto,
@@ -228,7 +229,7 @@ function Thread(props: { client: Client; conversation: ConversationDto; node: No
   }, [client, conversation.id]);
 
   const bytes = utf8Length(draft.trim());
-  const max = node?.maxTextBytes ?? 0;
+  const max = node ? textLimit(node, conversation.kind) : 0;
   const connected = node?.state === "connected";
   const canSend = connected && !sending && bytes > 0 && bytes <= max;
   const via = node ? `${node.name} (${networkLabel[node.network]})` : `${conversation.connectorId} (removed)`;
@@ -354,7 +355,7 @@ function NewConversation(props: {
 
   const node = props.nodes.find((n) => n.id === nodeId) ?? null;
   const bytes = utf8Length(text.trim());
-  const max = node?.maxTextBytes ?? 0;
+  const max = node ? textLimit(node, kind) : 0;
   const canSend = !!node && node.state === "connected" && !busy && peer.trim() !== "" && bytes > 0 && bytes <= max;
 
   const submit = async () => {

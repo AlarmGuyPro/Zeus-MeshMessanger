@@ -16,7 +16,8 @@ export interface NodeDto {
   name: string;
   state: NodeState;
   detail: string | null;
-  maxTextBytes: number;
+  maxDirectTextBytes: number;
+  maxChannelTextBytes: number;
 }
 
 export interface MessageDto {
@@ -86,6 +87,10 @@ export const networkShort: Record<Network, string> = {
   meshtastic: "MT",
   meshcore: "MC",
 };
+
+export function textLimit(node: NodeDto, kind: "channel" | "direct"): number {
+  return kind === "channel" ? node.maxChannelTextBytes : node.maxDirectTextBytes;
+}
 
 export function utf8Length(text: string): number {
   return new TextEncoder().encode(text).length;
