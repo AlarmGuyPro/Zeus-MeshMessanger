@@ -7,6 +7,10 @@ inside Zeus, through LoRa nodes (such as a Heltec V4) on your Wi-Fi.
 > connectors are not implemented yet, so nodes show as disconnected and sends
 > fail with "not implemented".
 
+User help: [docs/help](docs/help/README.md), including an
+[options reference](docs/help/options.md) that says what every setting does
+and whether it transmits.
+
 ## How it behaves
 
 - One inbox for both networks. Every conversation shows a network badge
@@ -73,5 +77,6 @@ See [DESIGN.md](DESIGN.md) for the architecture and routing rules.
 
 ## License
 
-GPL-2.0-or-later. See [LICENSE](LICENSE). `sdk/` is a vendored copy of the
-public Zeus plugin contracts (see `sdk/UPSTREAM.md`).
+GPL-3.0-or-later. See [LICENSE](LICENSE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). `sdk/` is a vendored copy of
+the public Zeus plugin contracts (GPL-2.0-or-later; see `sdk/UPSTREAM.md`).

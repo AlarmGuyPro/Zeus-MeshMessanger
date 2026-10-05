@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Zeus loads this ESM module and calls its default export with the public
 // plugin API. The panel id must match ui.panels[].id in plugin.json.
 import { createClient, type ZeusPluginApi } from "./api";

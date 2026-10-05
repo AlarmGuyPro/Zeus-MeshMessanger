@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 using MeshMessenger.Api;
 using MeshMessenger.Connectors.MeshCore;
 using MeshMessenger.Connectors.Meshtastic;

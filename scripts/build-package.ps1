@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds the feature ZIP from zeus-build.json, the same contract the Zeus
 # catalog's rebuild check uses, so the local package and the CI rebuild are
 # assembled from one list of files.

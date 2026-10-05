@@ -138,10 +138,10 @@ flagged by the catalog's security scan.
 
 Everything Mesh Messenger transmits goes through one transmit coordinator,
 shared by all connectors: one operator-initiated transmission at a time
-across every node, spaced by the previous send's airtime, and held while
-Zeus itself is transmitting (pending the MOX decision in
-ZEUS-REQUIREMENTS.md §1). Nothing transmits without an operator action,
-except opt-in room re-login on connect.
+across every node, spaced by the previous send's airtime. There is no
+interlock with Zeus's own transmitter (decided; see ZEUS-REQUIREMENTS.md §1).
+Nothing transmits without an operator action except the opt-in, off-by-default
+automatics listed in [docs/help/options.md](docs/help/options.md).
 
 ## Connection etiquette
 

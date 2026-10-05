@@ -16,8 +16,12 @@ Guiding rules:
 - **Every action stays on its own node** (DESIGN.md rule 1–3 apply to tools
   too: a traceroute on a Meshtastic conversation runs on that Meshtastic node).
 - **Airtime is shared.** Anything that transmits beyond a message (traces,
-  path discovery, adverts, status requests) is an explicit button press, shows
-  a cooldown, and is never automatic or repeating.
+  path discovery, adverts, status requests) is an explicit button press with
+  a cooldown. The only automatic transmissions are opt-in, off by default,
+  and labelled "Transmits automatically" in the panel and in
+  [help/options.md](help/options.md).
+- **Every option explains itself** in the panel: one line on what it does,
+  a Transmits label, and the matching help page (bundled from `docs/help/`).
 
 ## Panel layout
 

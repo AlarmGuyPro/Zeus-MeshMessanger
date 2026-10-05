@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 using MeshMessenger.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

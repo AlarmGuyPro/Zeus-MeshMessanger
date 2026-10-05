@@ -2,8 +2,8 @@
 
 Every rule in the Zeus catalog's `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
 pull-request template, SDK contracts and `tools/package-security-rules.md`
-(catalog @ `453f360`), checked against this feature. Items marked **Decide**
-need the owner's call before release.
+(catalog @ `453f360`), checked against this feature. Owner decisions are
+recorded inline with their date.
 
 ## 1. Transmit safety
 
@@ -17,8 +17,8 @@ transmitters too.
 |---|---|
 | **Every transmission we cause is operator-initiated**: Send, traceroute, path discovery, trace, advert, join room, repeater status. No auto-replies, no beacons, no repeating timers. | Zeus PR checklist: "never auto-keys a transmitter"; reviewers ask how transmit is kept operator-led. |
 | **One transmission at a time across all nodes.** A single transmit coordinator serialises everything we initiate on every connector and waits for the previous send's airtime (MeshCore's suggested timeout, Meshtastic's queue status) before the next. | The Zeus "never two transmitters keyed at once" principle; two 900 MHz nodes at one site transmitting together desense each other. |
-| **Hold mesh sends while Zeus is transmitting (MOX).** Sends wait, visibly ("Waiting for Zeus TX to end"), and fail after a short timeout rather than go out late. | Same principle across radios; LoRa node sits near the HF station. **Decide**: needs the read-only `ReadRadioState` capability (MOX only, never frequency/mode changes). |
-| The few automatic transmissions (room re-login on connect) are **opt-in per room**, disclosed in the UI, spaced out and never retried in a loop. | Keeps automation explicit. **Decide** default (operator-felt default). |
+| **No MOX interlock.** Mesh sends are not held while Zeus transmits. | Decided 2026-10-05: HF and 915 MHz don't interact meaningfully once the node is sited away from the HF antenna (documented setup), and holding sends wouldn't protect the node's receiver anyway (that's about siting, not timing). Avoids requesting `ReadRadioState`, keeping the feature's footprint to network + settings. Revisit only if someone reports a real interaction. |
+| The few automatic transmissions (room rejoin on connect, automatic repeater status, Store & Forward request on connect) are **opt-in, off by default**, each explained in the in-app help with a "Transmits automatically" label, spaced out and never retried in a loop. | Keeps automation explicit. Decided 2026-10-05. |
 | Physical separation is documented: the nodes' own automatic traffic (repeating, acks, telemetry) can't be coordinated by software. | Honest limit of the above. |
 | Keys typed in the panel never reach Zeus hotkeys (Space = transmit). No global key listeners. | Scan rule `js-global-keys`; styling contract. Already in the panel. |
 
@@ -65,27 +65,32 @@ leak in Mesh Messenger is a crash or leak in Zeus.
   (use `--tx` for "sending / waiting for TX"); done in the scaffold except
   screenshots.
 - Third-party notices: identify precisely what was derived from where (see 5).
+- Operator documentation: user help in `docs/help/`, bundled into the panel
+  (imported as text into the UI module and rendered without raw HTML, so no
+  filesystem access or `innerHTML`). Every option in the panel shows a
+  one-line description and a **Transmits: no / when you press it /
+  automatically** label matching `docs/help/options.md`.
 
-## 5. Licensing — Decide
+## 5. Licensing — decided: GPL-3.0-or-later
 
-- The Meshtastic protocol definitions (`meshtastic/protobufs`) are
-  **GPL-3.0**. Our codec is hand-written, but it encodes their message
-  definitions field for field. MeshCore firmware and meshcore-cli are MIT.
-- The feature is currently GPL-2.0-or-later. Relicensing to
-  **GPL-3.0-or-later** before the first release (simple now, while there is
-  one author) avoids any question about combining with GPL-3.0 material, and
-  is compatible with the Zeus SDK's GPL-2.0-or-later. This is a judgement
-  call, not legal advice.
-- Either way, add `THIRD_PARTY_NOTICES.md` naming the upstream repositories,
-  commits and licences the protocol work was derived from.
+- The Meshtastic protocol definitions (`meshtastic/protobufs`) are GPL-3.0
+  and our codec mirrors them field for field; MeshCore firmware and
+  meshcore-cli are MIT. The feature is therefore licensed
+  **GPL-3.0-or-later** (changed 2026-10-05).
+- No conflict with Zeus: the SDK contracts are GPL-2.0-or-later, which can be
+  used under GPL-3.0; the catalog allows any declared compatible licence, and
+  three listed features already use GPL-3.0-only. The vendored `sdk/` files
+  keep their own GPL-2.0-or-later headers.
+- `THIRD_PARTY_NOTICES.md` names every upstream source, commit and licence,
+  and is shipped in the package. Not legal advice.
 
 ## 6. Catalog pull request etiquette
 
 - The catalog repository's rules forbid mentioning AI assistants in anything
   visible in **that** repository (the listing PR, its description and
   commits), with credit to the human author. Write the listing PR yourself
-  or strip such mentions. **Decide** whether to apply the same to this
-  repository's commit trailers.
+  or strip such mentions. This repository's own commits keep their
+  co-author trailers (decided 2026-10-05).
 - One feature version per PR, `registry.json` only, `source` block with the
   exact commit, intake ZIP on a GitHub Release, never replaced.
 

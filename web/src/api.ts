@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Typed wrappers over the host's callBackend. Paths are relative to
 // /api/plugins/io.github.alarmguypro.meshmessenger/ — never call Zeus routes directly.
 

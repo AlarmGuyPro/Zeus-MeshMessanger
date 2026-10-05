@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Zeus styling contract: every selector sits under the feature root class,
 // colors come only from the public tokens, no animation.
 export const ROOT = "io-github-alarmguypro-meshmessenger";

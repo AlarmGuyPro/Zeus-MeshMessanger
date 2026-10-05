@@ -5,11 +5,15 @@
     "configuration": "Release"
   },
   "node": [
-    { "directory": "web", "script": "build" }
+    {
+      "directory": "web",
+      "script": "build"
+    }
   ],
   "package": {
     "plugin.json": "src/MeshMessenger/plugin.json",
     "LICENSE": "LICENSE",
+    "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
     "README.md": "README.md",
     "ui/meshmessenger.js": "web/dist/meshmessenger.js"
   }

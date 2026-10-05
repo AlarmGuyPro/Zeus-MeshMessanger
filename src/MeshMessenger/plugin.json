@@ -6,7 +6,7 @@
   "author": "AlarmGuyPro",
   "description": "Read, send and reply to Meshtastic and MeshCore messages through Wi-Fi-connected LoRa nodes, in one inbox that keeps each network separate.",
   "homepage": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-  "license": "GPL-2.0-or-later",
+  "license": "GPL-3.0-or-later",
   "sdk": { "abi": 1, "minVersion": "1.5.0" },
   "entrypoint": {
     "assembly": "MeshMessenger.dll",
