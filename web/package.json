@@ -1,0 +1,16 @@
+{
+  "name": "meshmessenger-ui",
+  "private": true,
+  "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.2"
+  }
+}

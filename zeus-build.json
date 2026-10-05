@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "dotnet": {
+    "project": "src/MeshMessenger/MeshMessenger.csproj",
+    "configuration": "Release"
+  },
+  "node": [
+    { "directory": "web", "script": "build" }
+  ],
+  "package": {
+    "plugin.json": "src/MeshMessenger/plugin.json",
+    "LICENSE": "LICENSE",
+    "README.md": "README.md",
+    "ui/meshmessenger.js": "web/dist/meshmessenger.js"
+  }
+}

@@ -1,0 +1,6 @@
+# The Zeus rebuild check compares plugin.json, LICENSE, README.md and the UI
+# bundle byte for byte on Linux. Keep every text file LF on every OS so a
+# Windows checkout packages exactly the same bytes.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

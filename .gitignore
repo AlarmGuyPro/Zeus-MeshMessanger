@@ -1,0 +1,14 @@
+artifacts/
+bin/
+obj/
+node_modules/
+web/dist/
+.zeus-build/
+.artifacts/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
