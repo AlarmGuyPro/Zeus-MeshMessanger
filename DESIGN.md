@@ -38,6 +38,18 @@ Zeus panel (web/)  ──callBackend──▶  Endpoints  ──▶  MessageRout
                                        └──▶ MessageStore ◀┘ (inbound messages, filed by conversation key)
 ```
 
+## Code layout
+
+- `src/MeshMessenger.Mesh/` — conversation model, routing, store and the
+  Meshtastic / MeshCore connectors. No Zeus or ASP.NET dependency, so the
+  optional Pi gateway ([docs/GATEWAY.md](docs/GATEWAY.md)) can reuse it.
+- `src/MeshMessenger/` — the Zeus plugin: lifecycle, settings, HTTP endpoints.
+- `web/` — the panel.
+
+Zeus-specific rules this design follows (transmit safety, in-process
+stability, LAN-only networking, packaging, licensing) are collected in
+[docs/ZEUS-REQUIREMENTS.md](docs/ZEUS-REQUIREMENTS.md).
+
 ## Rule 1: a conversation belongs to exactly one node
 
 Every conversation is identified by a `ConversationKey`:
@@ -122,6 +134,15 @@ flagged by the catalog's security scan.
   into the panel's fields are stopped from reaching host hotkeys (Space is
   transmit in Zeus).
 
+## Transmit coordination
+
+Everything Mesh Messenger transmits goes through one transmit coordinator,
+shared by all connectors: one operator-initiated transmission at a time
+across every node, spaced by the previous send's airtime, and held while
+Zeus itself is transmitting (pending the MOX decision in
+ZEUS-REQUIREMENTS.md §1). Nothing transmits without an operator action,
+except opt-in room re-login on connect.
+
 ## Connection etiquette
 
 - **MeshCore nodes accept one TCP client at a time** and drop the old one
@@ -141,22 +162,22 @@ flagged by the catalog's security scan.
 3. **Persistence**: message history in the settings store, so a Zeus restart
    never loses what was already shown (moved up: needed before the connectors
    are useful).
-4. **MeshCore connector**: companion TCP framing, app start, clock sync,
+4. **Transmit coordinator** and the test runner (plain console project, no
+   packages): routing, no-fallback, coordinator and text-limit tests. Comes
+   before the connectors because every send goes through it.
+5. **MeshCore connector**: companion TCP framing, app start, clock sync,
    contact sync, drain the offline queue, channel and contact messages,
    reconnect with backoff.
-5. **Meshtastic connector**: TCP framing, `want_config` handshake, node DB for
+6. **Meshtastic connector**: TCP framing, `want_config` handshake, node DB for
    names, text send/receive on channels and DMs, reconnect with backoff,
    Store & Forward history where a server exists.
-6. Then the tools in docs/FEATURES.md, tier by tier, including room servers
+7. Then the tools in docs/FEATURES.md, tier by tier, including room servers
    and repeater status.
-7. **Tests and release**: router tests (especially "no fallback"), codec tests
-   from captured frames, screenshot set, first `v0.x` release and catalog PR.
+8. **Release**: codec tests from captured frames, screenshot set, first
+   `v0.x` release and catalog PR.
+9. **Gateway** (optional, separate install): see docs/GATEWAY.md.
 
 ## Open questions
 
-- Test project: the rebuild check lints every `.csproj` in the repo, and xUnit
-  packages ship MSBuild targets. Ask the Zeus maintainers whether a test
-  project is fine as long as it isn't the `dotnet.project`, or keep tests out
-  of tree.
 - Confirm Zeus already ignores its hotkeys while focus is in a text field; if
   so, the panel's key isolation is belt and braces.

@@ -11,5 +11,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../sdk/Zeussdr.Zeus.Plugins.Contracts/Zeus.Plugins.Contracts.csproj"
                       Private="false" />
+    <ProjectReference Include="../MeshMessenger.Mesh/MeshMessenger.Mesh.csproj" />
   </ItemGroup>
 </Project>

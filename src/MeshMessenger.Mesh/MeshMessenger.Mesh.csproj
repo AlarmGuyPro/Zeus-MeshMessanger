@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Mesh protocol library shared by the Zeus plugin and the (future) gateway.
+       No Zeus, no ASP.NET, no third-party packages. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>MeshMessenger.Mesh</AssemblyName>
+    <RootNamespace>MeshMessenger</RootNamespace>
+    <Version>0.1.0</Version>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

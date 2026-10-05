@@ -76,15 +76,23 @@ dotnet build $projectPath -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) { throw "dotnet build failed: $LASTEXITCODE" }
 $outDir = Join-Path $projectDir "bin/$Configuration/net10.0"
 
-# 3. Stage: entrypoint DLL + .deps.json from build output, everything else from the contract map.
+# 3. Stage: every DLL the build produced (the entrypoint plus our own libraries)
+#    and the entrypoint .deps.json from build output; everything else from the
+#    contract map. The Zeus contracts DLL is provided by the host and must not ship.
 $artifactRoot = Join-Path $repoRoot "artifacts/$id"
 $staging = Join-Path $artifactRoot "staging"
 if (Test-Path $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
-foreach ($file in @($entrypoint, [IO.Path]::ChangeExtension($entrypoint, ".deps.json"))) {
+$outputFiles = @(Get-ChildItem -LiteralPath $outDir -Filter *.dll -File |
+    Where-Object { $_.Name -ne "Zeus.Plugins.Contracts.dll" } |
+    ForEach-Object { $_.Name })
+if ($outputFiles -notcontains $entrypoint) { throw "Build output missing entrypoint: $entrypoint" }
+$outputFiles += [IO.Path]::ChangeExtension($entrypoint, ".deps.json")
+foreach ($file in $outputFiles) {
     $src = Join-Path $outDir $file
     if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { throw "Build output missing: $src" }
+    Assert-NoLink $src "Build output"
     Copy-Item -LiteralPath $src -Destination (Join-Path $staging $file)
 }
 
