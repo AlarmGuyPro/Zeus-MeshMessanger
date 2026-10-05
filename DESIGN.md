@@ -6,6 +6,15 @@ the station's Wi-Fi.
 
 Feature ID (permanent): `io.github.alarmguypro.meshmessenger`
 
+## Deployment model
+
+Zeus gets a **dedicated node**: one LoRa node on the shack's Wi-Fi, mains
+powered, used by nothing else. It is its own station on the mesh (own name,
+contacts and DMs) and reaches the rest of the mesh through local repeaters.
+Because it stays powered when Zeus is closed, it holds incoming messages until
+Zeus reconnects. See [docs/OFFLINE-AND-ROOMS.md](docs/OFFLINE-AND-ROOMS.md)
+for offline behaviour and MeshCore room servers.
+
 ## Shape
 
 One feature, one panel, one unified inbox, and one **connector** per
@@ -129,12 +138,18 @@ flagged by the catalog's security scan.
 2. **Node configuration**: `GET/PUT config` endpoints and a settings view in the
    panel (add/edit/remove nodes; host, port, network, name). Restart connectors
    on change.
-3. **Meshtastic connector** (then the tools in docs/FEATURES.md, tier by tier): TCP framing, `want_config` handshake, node DB for
-   names, text send/receive on channels and DMs, reconnect with backoff.
-4. **MeshCore connector**: companion TCP framing, app start / contact sync,
-   channel and contact messages, reconnect with backoff.
-5. **Persistence**: keep recent conversations across Zeus restarts.
-6. **Tests and release**: router tests (especially "no fallback"), codec tests
+3. **Persistence**: message history in the settings store, so a Zeus restart
+   never loses what was already shown (moved up: needed before the connectors
+   are useful).
+4. **MeshCore connector**: companion TCP framing, app start, clock sync,
+   contact sync, drain the offline queue, channel and contact messages,
+   reconnect with backoff.
+5. **Meshtastic connector**: TCP framing, `want_config` handshake, node DB for
+   names, text send/receive on channels and DMs, reconnect with backoff,
+   Store & Forward history where a server exists.
+6. Then the tools in docs/FEATURES.md, tier by tier, including room servers
+   and repeater status.
+7. **Tests and release**: router tests (especially "no fallback"), codec tests
    from captured frames, screenshot set, first `v0.x` release and catalog PR.
 
 ## Open questions

@@ -26,6 +26,18 @@ not touch PureSignal.
 
 ## Setting up a node
 
+Give Zeus its own node: a LoRa board (such as a Heltec V4) on your Wi-Fi,
+powered from the shack, that nothing else connects to. It becomes its own
+station on your mesh, reaching it through your local repeaters, and it keeps
+collecting messages while Zeus is closed. People message the station by the
+node's name, so pick a clear one such as `<callsign> Shack`.
+
+Keep the node and its antenna away from your HF antenna and feedline: strong
+HF transmit signals can overload or damage it, and its Wi-Fi and switching
+noise can show up in the SDR. An external antenna mounted a little way from
+the station helps both ways.
+
+
 Flash the node with Wi-Fi-enabled firmware and join it to the same network as
 the Zeus computer:
 

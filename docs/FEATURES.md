@@ -10,8 +10,8 @@ and [protocols/meshcore.md](protocols/meshcore.md).
 Guiding rules:
 
 - **Read freely, write narrowly.** Mesh Messenger may change only what an
-  operator changes routinely: messages, channel membership, contact routes,
-  favourites.
+  operator changes routinely: messages, channel and room membership,
+  contact routes, favourites.
   It never changes radio parameters, device role, keys, firmware or modules.
 - **Every action stays on its own node** (DESIGN.md rule 1–3 apply to tools
   too: a traceroute on a Meshtastic conversation runs on that Meshtastic node).
@@ -21,7 +21,8 @@ Guiding rules:
 
 ## Panel layout
 
-One panel with four tabs: **Inbox**, **Channels**, **Nodes**, **Health**. The
+One panel with four tabs: **Inbox** (channels, DMs and rooms), **Channels**
+(including rooms), **Nodes**, **Health**. The
 node bar across the top (network badge, name, connection state, battery) is
 always visible.
 
@@ -73,7 +74,26 @@ Channel keys are shown only on an explicit "Show key" action and never logged.
 | Reset route (force re-learn by flood) | — | `RESET_PATH` |
 | Message route detail: hops, SNR/RSSI of last hop | ✓ | ✓ |
 
-### Health (own node)
+### Rooms (MeshCore room servers)
+
+| Tool | MeshCore |
+|---|---|
+| Join a room: pick the room-server contact, enter the room password once (stored, never shown) | member login (`SEND_LOGIN`) |
+| Re-login to every joined room on connect, so missed posts are pushed | automatic, spaced out |
+| Read and post; author shown per post; own posts kept locally (the room doesn't echo them) | signed DMs from the room / DM to the room |
+| Leave a room (forget password, stop re-login) | local |
+
+Details and placement advice: [OFFLINE-AND-ROOMS.md](OFFLINE-AND-ROOMS.md).
+
+### Offline catch-up
+
+| Tool | Meshtastic | MeshCore |
+|---|---|---|
+| Messages held by the node while Zeus was closed, marked as such | small node queue (8–32 packets) | node offline queue (256 on V4 Wi-Fi build) |
+| History from a store on the mesh | Store & Forward `CLIENT_HISTORY`, de-duplicated | room servers (above) |
+| "Messages may have been missed" banner for gaps | ✓ | ✓ |
+
+### Health (own node and local infrastructure)
 
 | Tool | Meshtastic | MeshCore |
 |---|---|---|
@@ -84,14 +104,13 @@ Channel keys are shown only on an explicit "Show key" action and never logged.
 | Nodes online / total | `LocalStats` | contact count |
 | Radio summary, read-only (region/preset or freq/BW/SF/CR, TX power) | config | `SELF_INFO` |
 | Firmware version / model, read-only | `DeviceMetadata` | `DEVICE_INFO` |
+| **Repeater status** for repeaters you choose (e.g. your tower): battery, noise floor, last RSSI/SNR, packets, dupes, airtime, uptime — on request only | — | guest login + `STATUS_REQ` (never the admin password) |
 
 ## Tier 3 — later, if wanted
 
-- MeshCore **repeater status** (`STATUS_REQ`, read-only, no login).
 - Meshtastic **neighbour info** (only where the module is enabled on the mesh).
 - Signal history sparkline per node (SNR over the session).
 - Reactions/tapbacks and replies-to (`Data.emoji`, `reply_id`).
-- Message persistence across Zeus restarts (planned for core, milestone 5).
 
 ## Left to the native apps and flashers
 
@@ -106,8 +125,9 @@ Deliberately **not** in Mesh Messenger:
 - Factory reset, node-DB reset, reboot/shutdown.
 - Module configuration: MQTT, serial, store-and-forward, telemetry sensors,
   range test, canned messages, external notification.
-- Remote administration of other nodes; repeater/room-server login and CLI
-  commands; MeshCore flood-scope/region keys; auto-add contact policy.
+- Remote administration of other nodes; admin logins and CLI commands on
+  repeaters and room servers (member/guest logins for rooms and repeater
+  status are in scope); MeshCore flood-scope/region keys; auto-add contact policy.
 - Raw packets, signing, custom variables, sensors/telemetry requests to
   sensor nodes.
 - Maps beyond distance/bearing (the apps do maps well).
@@ -115,9 +135,11 @@ Deliberately **not** in Mesh Messenger:
 ## Build order
 
 1. Node configuration in the panel (milestone 2 in DESIGN.md).
-2. Both connectors: connect, handshake, messages, delivery status, reception
-   line (tier 1).
-3. Channels tab: list, join (public/hashtag/URL/key), create, share, leave.
-4. Nodes tab: heard list, distance/bearing, DM from node, advert.
-5. Route tools: traceroute / path discovery / trace / reset path.
-6. Health tab.
+2. Message persistence.
+3. Both connectors: connect, handshake, messages, delivery status, reception
+   line, offline catch-up (tier 1).
+4. Channels tab: list, join (public/hashtag/URL/key), create, share, leave.
+5. Rooms: join, re-login on connect, read and post.
+6. Nodes tab: heard list, distance/bearing, DM from node, advert.
+7. Route tools: traceroute / path discovery / trace / reset path.
+8. Health tab, including repeater status.
