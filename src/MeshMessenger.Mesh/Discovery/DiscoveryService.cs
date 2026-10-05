@@ -56,7 +56,7 @@ public sealed class DiscoveryService : IAsyncDisposable
     private Task? _scanTask;
 
     /// <param name="savedRanges">Operator-added networks (CIDR).</param>
-    /// <param name="busyHosts">"host:port" of MeshCore nodes Zeus is connected to: never probed (a probe would drop our own connection).</param>
+    /// <param name="busyHosts">"host:port" of nodes Zeus is connected to: never probed (on MeshCore a probe would drop our own connection).</param>
     public DiscoveryService(Func<IReadOnlyList<string>> savedRanges, Func<IReadOnlyCollection<string>> busyHosts,
         DiscoveryOptions? options = null, TimeProvider? time = null)
     {
@@ -164,7 +164,8 @@ public sealed class DiscoveryService : IAsyncDisposable
             {
                 foreach (var address in net.Hosts())
                 {
-                    targets.Add((address, MeshNetwork.Meshtastic, _options.MeshtasticPort, net));
+                    if (!busy.Contains($"{address}:{_options.MeshtasticPort}"))
+                        targets.Add((address, MeshNetwork.Meshtastic, _options.MeshtasticPort, net));
                     if (!busy.Contains($"{address}:{_options.MeshCorePort}"))
                         targets.Add((address, MeshNetwork.MeshCore, _options.MeshCorePort, net));
                 }

@@ -94,6 +94,25 @@ public static class ConnectorTests
     }
 
     [Test]
+    public static async Task MeshCoreRoomPostIsFiledUnderTheRoomWithItsAuthor()
+    {
+        await using var node = new FakeMeshCoreNode();
+        var room = node.AddContact("Shack Board", type: 3);
+        var sarah = node.AddContact("Sarah");
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        var got = new List<InboundMessage>();
+        c.MessageReceived += m => { lock (got) got.Add(m); };
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        await node.HearRoomPostAsync(room, sarah, "dinner at 6");
+        await Assert.Eventually(() => got.Count == 1, "post delivered");
+        Assert.Equal(ConversationKind.Room, got[0].Conversation.Kind, "room conversation");
+        Assert.Equal(Convert.ToHexString(room).ToLowerInvariant(), got[0].Conversation.Peer, "keyed by the room");
+        Assert.Equal("Sarah", got[0].FromName, "author resolved from contacts");
+        Assert.Equal("dinner at 6", got[0].Text, "text without the signature bytes");
+    }
+
+    [Test]
     public static async Task MeshCoreRefusesADifferentNodeAtTheAddress()
     {
         await using var node = new FakeMeshCoreNode();

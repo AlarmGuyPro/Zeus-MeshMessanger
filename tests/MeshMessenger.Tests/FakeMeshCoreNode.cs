@@ -85,6 +85,23 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
         return TickleAsync();
     }
 
+    /// <summary>A room server pushing a post: a signed DM from the room carrying the author's key prefix.</summary>
+    public Task HearRoomPostAsync(byte[] roomKey, byte[] authorKey, string text)
+    {
+        var t = Encoding.UTF8.GetBytes(text);
+        var f = new byte[20 + t.Length];
+        f[0] = RespContactMsgRecvV3;
+        f[1] = 36;
+        roomKey.AsSpan(0, 6).CopyTo(f.AsSpan(4));
+        f[10] = 0xFF;
+        f[11] = TxtSignedPlain;
+        BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(12), (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        authorKey.AsSpan(0, 4).CopyTo(f.AsSpan(16));
+        t.CopyTo(f, 20);
+        _queue.Enqueue(f);
+        return TickleAsync();
+    }
+
     private async Task TickleAsync()
     {
         if (_client is not null) await WriteAsync(_client, [PushMsgWaiting]);

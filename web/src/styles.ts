@@ -14,6 +14,7 @@ ${r} {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
   color: var(--fg-1);
   background: var(--bg-1);
   font-family: var(--font-sans);
@@ -57,10 +58,14 @@ ${e("body")} {
   display: grid;
   grid-template-columns: minmax(180px, 35%) 1fr;
   flex: 1;
-  min-height: 0;
+  /* Short panels (or 200% zoom) scroll the whole panel rather than squeezing the thread to nothing. */
+  min-height: 20em;
 }
 ${e("list")} {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
+  min-width: 0;
   border-right: 1px solid var(--line);
   margin: 0;
   padding: 0;
@@ -81,9 +86,9 @@ ${e("item")} {
   cursor: pointer;
 }
 ${e("item--selected")} { border-left-color: var(--accent); background: var(--bg-2); }
-${e("item-top")} { display: flex; align-items: center; gap: 6px; }
+${e("item-top")} { display: flex; min-width: 0; align-items: center; gap: 6px; }
 ${e("item-title")} { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-${e("item-preview")} { margin-top: 2px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+${e("item-preview")} { display: block; margin-top: 2px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 ${e("unread")} {
   padding: 0 6px;
   border-radius: var(--r-lg);
@@ -158,6 +163,66 @@ ${e("notice")} {
 ${e("notice--warn")} { border-color: var(--amber); }
 ${e("over")} { color: var(--amber); font-weight: 600; }
 ${e("back")} { display: none; }
+${e("tabs")} {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-0);
+}
+${e("tab")} {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid var(--bg-0);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+${e("tab--on")} { color: var(--fg-0); border-bottom-color: var(--accent); }
+${e("pane")} { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+${e("card")} { padding: 12px; border: 1px solid var(--panel-border); border-radius: var(--r-md); background: var(--bg-2); display: flex; flex-direction: column; gap: 8px; }
+${e("card-head")} { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+${e("h")} { margin: 0; font-size: 14px; font-weight: 600; color: var(--fg-0); }
+${e("table")} { width: 100%; border-collapse: collapse; }
+${e("table")} th { padding: 6px 8px; text-align: left; color: var(--fg-2); font-size: 11px; font-weight: 600; border-bottom: 1px solid var(--line); }
+${e("table")} td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+${e("num")} { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+${e("table")} th${e("num")} { text-align: right; }
+${e("mono")} { font-family: var(--font-mono); }
+${e("scroll-x")} { overflow-x: auto; }
+${e("tx-label")} {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  color: var(--fg-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+${e("tx-label--auto")} { border-color: var(--amber); color: var(--amber); }
+${e("help")} { color: var(--fg-2); font-size: 12px; line-height: 1.5; }
+${e("progress")} { height: 4px; border-radius: var(--r-xs); background: var(--bg-3); overflow: hidden; }
+${e("progress-bar")} { height: 4px; background: var(--accent); }
+${e("divider")} { display: flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 12px; }
+${e("divider")}::before, ${e("divider")}::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+${e("ok")} { color: var(--ok); }
+${e("warn")} { color: var(--amber); }
+${e("chip")} {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-1);
+  font-size: 12px;
+}
 @container (max-width: 520px) {
   ${e("body")} { grid-template-columns: 1fr; }
   ${e("body--thread")} ${e("list")} { display: none; }

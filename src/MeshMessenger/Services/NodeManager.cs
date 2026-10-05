@@ -277,7 +277,7 @@ internal sealed class NodeManager : IAsyncDisposable
     private Task SaveConfigAsync(CancellationToken ct) => _settings.SaveConfigAsync(_config, ct);
 
     private IReadOnlyCollection<string> BusyHosts() =>
-        _connectors.Where(c => c.Network == MeshNetwork.MeshCore && c.State is ConnectorState.Connected or ConnectorState.Connecting)
+        _connectors.Where(c => c.State is ConnectorState.Connected or ConnectorState.Connecting)
             .Select(c => $"{HostOnly(c.Host)}:{c.Port}").ToArray();
 
     /// <summary>"192.168.1.5:5001" → ("192.168.1.5", 5001); a bare host keeps its configured port.</summary>
