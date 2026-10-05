@@ -101,3 +101,29 @@ catalog, but the plugin's `Gateway` connector is. It must follow everything
 above, the gateway enforces the same routing and transmit rules, and the
 plugin's README must say clearly that the gateway is a separate, optional
 install.
+
+## 8. Lessons from PowerStation's catalog review (KQ4WLR, 1.1.0)
+
+PowerStation was the first listing through the new catalog gates. What the
+maintainer asked for there, applied here:
+
+- **Re-find must stay local and never carry secrets to a new address
+  unconfirmed.** Found addresses are filtered to local ranges at parse time
+  and again before probing; a node with stored passwords moves only after
+  Use / Ignore (DISCOVERY.md).
+- **Loopback refused**, enabled only by the test suite
+  (`HostValidator.AllowLoopback`).
+- **TX interlock** was required there because Shelly outputs can switch
+  amplifiers. Mesh Messenger switches nothing at the station and its node is
+  sited away from HF, so it has no interlock (decision in §1); say so in the
+  PR's capability section before the reviewer asks.
+- **Run the catalog's own tools before submitting**: `verify-source-build.ps1`
+  from a fresh clone of the release commit, `PackageSecurityScan scan`,
+  `validate-package.ps1`, `validate-registry.ps1`,
+  `validate-community-submission.ps1`. PowerStation 1.1.0 came back clear on
+  all of them.
+- **Same build pins as PowerStation**: SDK `10.0.112` with roll-forward
+  disabled; dependency-free console test project with a lock file.
+- Keep a `docs/catalog/` folder with the PR description and replies to each
+  review round, as PowerStation does.
+

@@ -9,7 +9,7 @@ address changes.
 
 | | Meshtastic | MeshCore (companion Wi-Fi) |
 |---|---|---|
-| mDNS service | `_meshtastic._tcp` on port 4403, TXT `id` (node id `!xxxxxxxx`), `shortname`, `pio_env` | none |
+| mDNS service | `_meshtastic._tcp` on port 4403, TXT `id` (node id `!xxxxxxxx`), `shortname`, `pio_env`. Every node uses the instance name `Meshtastic`, so nodes are told apart by address and TXT `id`. | none |
 | DHCP host name | `Meshtastic-XXYY` (last two MAC bytes) | ESP32 default (not set by MeshCore) |
 | TCP port | 4403 | 5000 |
 | Identity on connect | `my_info.my_node_num` (+ node id) | `SELF_INFO` public key + node name |
@@ -29,8 +29,8 @@ address changes.
    - the Zeus PC's own subnets (detected automatically; private ranges only;
      a network larger than /22 is limited to the /24 around the PC), and
    - **extra ranges the operator adds**, e.g. `192.168.30.0/24` for an IoT
-     VLAN, or `10.0.20.10-10.0.20.80`. Private addresses only; each range at
-     most /22 (1,024 addresses).
+     VLAN. Private, link-local or CGNAT (100.64/10) addresses only; each range
+     at most /20 (4,094 addresses) — the same limits as PowerStation.
 3. **Host name** typed by the operator (`Meshtastic-3f2a`, `node.lan`), for
    people who prefer it.
 
@@ -77,19 +77,29 @@ default. When the paired node stops answering at its last address:
 
 This is LAN traffic only; nothing is transmitted on the mesh.
 
+**Nodes with stored secrets move only with confirmation** (same rule the
+catalog maintainer accepted for PowerStation's Shelly passwords): if a node
+has a room password or repeater guest password saved, an automatic re-find
+only *records* the new address and shows "Found at 192.168.30.52 — Use /
+Ignore" in the node bar. Nothing beyond the identity check is sent to the new
+address until the operator presses Use. Ignore keeps the old address and
+doesn't offer that one again this session. Nodes with no stored secrets move
+on their own.
+
 ## Etiquette and limits
 
 - **Scans run only when the operator presses Scan**, during first setup, or
   for the automatic re-find above. No background sweeps of the network.
-- Bounded: ports 4403 and 5000 only; at most 64 probes at once; 300 ms
+- Bounded: ports 4403 and 5000 only; at most 48 probes at once; 900 ms
   connect timeout; identify step 3 s; a /24 finishes in a few seconds.
 - **MeshCore side effect:** probing a MeshCore node disconnects any app
   using it at that moment. The scan skips nodes Zeus is already connected to
   and says so up front: "Scanning may briefly disconnect a phone or
   meshcore-cli connected to another MeshCore node over Wi-Fi."
-- Private address ranges only (10/8, 172.16/12, 192.168/16, and IPv6 ULA /
-  link-local for mDNS). Public addresses are refused, here and in manual
-  configuration.
+- Local address ranges only (10/8, 172.16/12, 192.168/16, 169.254/16,
+  100.64/10, IPv6 ULA / link-local). Public addresses and loopback are
+  refused, here and in manual configuration; mDNS answers whose A record
+  points elsewhere are dropped while parsing.
 - **VLANs:** the router/firewall must allow the Zeus PC to open TCP 4403 /
   5000 to the nodes' VLAN. Zeus can't fix a firewall; when a configured range
   answers nothing at all, the help explains this.
@@ -100,9 +110,10 @@ This is LAN traffic only; nothing is transmitted on the mesh.
   `System.Net.NetworkInformation` (to read the PC's own subnets): covered by
   the declared `NetworkAccess` capability. No raw sockets, ARP, ICMP or
   external processes.
-- No third-party mDNS library (repo rule: no non-Microsoft packages); a
-  minimal DNS-SD query/response parser is written in the shared library and
-  fuzz-tested like the protocol parsers.
+- No third-party mDNS library: `Discovery/Mdns.cs`, `Ipv4Network.cs` and
+  `HostValidator.cs` are adapted from PowerStation (commit `c9c984d`), which
+  passed catalog review with a clear package security scan and an exact
+  source rebuild. Its tests (`DiscoveryTests.cs`) are the model for ours.
 - The PR's capability section must describe the scan exactly as above:
   operator-triggered, private ranges, two ports, identity-confirmed.
 

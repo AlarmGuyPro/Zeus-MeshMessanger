@@ -4,6 +4,14 @@ Mesh Messenger is licensed under GPL-3.0-or-later (see `LICENSE`). It contains
 no copied third-party source files. The items below are what it is derived
 from or built against.
 
+## Mesh Messenger's own earlier work
+
+- `src/MeshMessenger.Mesh/Discovery/` (`Mdns.cs`, `Ipv4Network.cs`,
+  `HostValidator.cs`) is adapted from the same author's Zeus-PowerStation
+  feature, <https://github.com/AlarmGuyPro/zeus-powerstation> (commit
+  `c9c984d`), originally GPL-2.0-or-later and relicensed here under
+  GPL-3.0-or-later by its author.
+
 ## Zeus plugin contracts
 
 - `sdk/Zeussdr.Zeus.Plugins.Contracts/` is an unmodified vendored copy of the

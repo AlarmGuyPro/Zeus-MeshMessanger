@@ -3,7 +3,7 @@
   "id": "io.github.alarmguypro.meshmessenger",
   "name": "Mesh Messenger",
   "version": "0.1.0",
-  "author": "AlarmGuyPro",
+  "author": "KQ4WLR",
   "description": "Read, send and reply to Meshtastic and MeshCore messages through Wi-Fi-connected LoRa nodes, in one inbox that keeps each network separate.",
   "homepage": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
   "license": "GPL-3.0-or-later",
