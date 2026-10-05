@@ -143,6 +143,15 @@ interlock with Zeus's own transmitter (decided; see ZEUS-REQUIREMENTS.md §1).
 Nothing transmits without an operator action except the opt-in, off-by-default
 automatics listed in [docs/help/options.md](docs/help/options.md).
 
+## Node identity
+
+A configured node is identified by **what it is**, not where it is: Zeus
+records the node's own identity (Meshtastic node number, MeshCore public key)
+when it is paired and checks it on every connect. A different node at the
+stored address is refused, so a reused IP can never make replies go out from
+the wrong station. Address changes are handled by re-discovery
+([docs/DISCOVERY.md](docs/DISCOVERY.md)).
+
 ## Connection etiquette
 
 - **MeshCore nodes accept one TCP client at a time** and drop the old one
@@ -156,9 +165,11 @@ automatics listed in [docs/help/options.md](docs/help/options.md).
 
 1. **Scaffold** (this commit): routing core, in-memory store, endpoints,
    connector stubs that report "not implemented", panel with every state.
-2. **Node configuration**: `GET/PUT config` endpoints and a settings view in the
-   panel (add/edit/remove nodes; host, port, network, name). Restart connectors
-   on change.
+2. **Node configuration and discovery**: settings view; **Scan** (mDNS for
+   Meshtastic, identity-confirmed probe of local subnets and operator-added
+   VLAN ranges for both), pairing by node identity, and automatic re-find when
+   a node's address changes ([docs/DISCOVERY.md](docs/DISCOVERY.md)). No
+   static IP needed.
 3. **Persistence**: message history in the settings store, so a Zeus restart
    never loses what was already shown (moved up: needed before the connectors
    are useful).

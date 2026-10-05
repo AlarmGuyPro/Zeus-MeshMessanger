@@ -54,8 +54,9 @@ the Zeus computer:
   talks to one app at a time: connecting the phone app or meshcore-cli over
   Wi-Fi disconnects Zeus until you close them.
 
-Give the node a fixed IP address (a DHCP reservation in your router) so Zeus
-can find it after a restart.
+Then use **Add node → Scan** in the panel: Zeus finds the node on your
+network (or on other VLANs you list) and remembers it, so no static IP is
+needed. See [docs/DISCOVERY.md](docs/DISCOVERY.md).
 
 ## Building (developers)
 

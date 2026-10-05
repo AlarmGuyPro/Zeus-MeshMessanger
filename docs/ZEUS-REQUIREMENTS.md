@@ -42,7 +42,7 @@ leak in Mesh Messenger is a crash or leak in Zeus.
 |---|---|
 | Declare only what's used | `NetworkAccess` + `permissions.network: true` (TCP to nodes). `PersistSettings`. Nothing else. |
 | No filesystem access | History, config, channel keys and room passwords live in the plugin settings store; no `File`/`Directory` APIs (scan rule `undeclared-filesystem`). |
-| Network use is LAN-only and explainable | Connect only to operator-configured node/gateway addresses, and **refuse public IP addresses** in configuration. No internet calls, no update checks, no telemetry. |
+| Network use is LAN-only and explainable | Connect only to configured or discovered nodes on private addresses; **refuse public IP addresses**. Discovery (mDNS + a probe of ports 4403/5000 on private ranges, identity-confirmed) runs only on Scan, at setup, or to re-find a paired node — described exactly in docs/DISCOVERY.md and the PR. No internet calls, no update checks, no telemetry. |
 | No secrets in logs or URLs | Channel keys and room passwords never logged, never in query strings, returned only by an explicit "show key" action. |
 | No host internals | No `[FromServices]`, `HttpContext.RequestServices`, environment variables, reflection or `HostDataDirectory` (scan rules `host-services`, `environment`, `reflection`, `host-data`). |
 | Scanner findings we will explain in the PR | Bundled `MeshMessenger.Mesh.dll` (`unexpected-assembly-ref`, review), the `meshtastic.org` share-URL prefix (`public-endpoint`, review). |

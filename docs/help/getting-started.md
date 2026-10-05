@@ -12,7 +12,7 @@ rest of the mesh through your repeaters like any other device.
 - Mount it, or at least its antenna, away from your HF antenna and feedline.
   Strong HF transmit signals can overload or damage it, and its Wi-Fi and
   power-supply noise can show up in your SDR.
-- Give it a fixed address on your network (a DHCP reservation in your router).
+- A fixed address (DHCP reservation) is optional: Zeus finds the node again if its address changes.
 
 ## 2. Firmware
 
@@ -28,9 +28,22 @@ rest of the mesh through your repeaters like any other device.
 
 ## 3. Add the node in Zeus
 
-In the Mesh Messenger panel: **Add node** → choose the network, enter its
-address, give it a name. The node bar shows its state (`connecting`,
-`connected`, `disconnected`, `error`) with the reason.
+In the Mesh Messenger panel: **Add node → Scan**. Zeus looks for Meshtastic
+and MeshCore nodes on your network and lists them by name; pick yours and
+press **Add**. You don't need to know its IP address or set a static address
+in your router: Zeus remembers the node itself and finds it again if its
+address changes.
+
+**Nodes on another VLAN** (for example an IoT network): add that network's
+range under **Settings → Nodes → Extra networks to scan**, e.g.
+`192.168.30.0/24`. Your router must allow the Zeus PC to reach that network
+on TCP ports 4403 (Meshtastic) and 5000 (MeshCore). If a range finds nothing
+at all, that's usually the firewall.
+
+You can still type an address or host name by hand under **Add manually**.
+
+The node bar shows its state (`connecting`, `connected`, `searching`,
+`disconnected`, `error`) with the reason.
 
 ## 4. Join your channels
 

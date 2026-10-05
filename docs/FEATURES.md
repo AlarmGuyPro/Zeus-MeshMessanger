@@ -45,6 +45,16 @@ always visible.
 
 ## Tier 2 — operational tools (used all the time)
 
+### Setup and discovery
+
+| Tool | Meshtastic | MeshCore |
+|---|---|---|
+| Scan for nodes (this LAN + operator-added VLAN ranges), identity-confirmed | mDNS `_meshtastic._tcp` + probe 4403 | probe 5000 (no mDNS in firmware) |
+| Pair by identity; refuse a different node at the stored address | node number | public key |
+| Find the node again when its address changes (on by default) | ✓ | ✓ |
+
+Details: [DISCOVERY.md](DISCOVERY.md).
+
 ### Channels / groups
 
 | Tool | Meshtastic | MeshCore |
