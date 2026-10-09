@@ -67,30 +67,44 @@ environment.
 
 ## Step 1: Bluetooth firmware and phone setup
 
-1. Plug the board into the PC with the USB-C cable.
+1. Attach the LoRa antenna, then plug the board into the PC with the USB-C
+   cable. If the board shipped with Meshtastic, its screen may light up; that's
+   fine, it gets erased.
 2. In **Chrome or Edge** (Firefox can't do this), open
    **<https://flasher.meshcore.io>**.
-3. Choose your device (**Heltec V4**; or the 8 MB/R8 entry if that's yours),
-   then the **Companion (Bluetooth / BLE)** firmware, then the latest version.
+3. Choose **Heltec V4**, then **Companion Bluetooth** (not Companion USB,
+   Repeater or Room Server), then the newest version (1.17.1 when this was
+   written).
 4. Tick **Erase device**. This is a first install, so there's nothing to keep.
-5. Click **Flash**, pick the board's COM port in the browser pop-up
-   (usually "USB JTAG/serial debug unit"), and wait for it to finish.
+5. Click **Flash**, pick **USB JTAG/serial debug unit** in the browser's port
+   pop-up, and wait for "Flashing complete!" (about a minute).
    - If no port appears, or flashing fails: hold the **PRG** (BOOT) button,
      tap **RST**, release **PRG**, then try again. This forces the board into
      download mode.
-6. The screen shows a Bluetooth PIN. In the **MeshCore app**, add a device,
-   pick the node and enter the PIN.
-7. In the app, set:
+   - The log also tells you which board you have: `Embedded PSRAM 2MB` is
+     the standard V4; `8MB` is the R8.
+6. **Connect the MeshCore app.** The app talks to **one radio at a time**. If
+   it's connected to another of your radios, use **Disconnect** first (and
+   switch that radio off so the phone doesn't reconnect to it). Then connect,
+   pick the new node, and enter the **PIN shown on the Heltec's screen**. The
+   app keeps each radio's contacts and messages separately, so switching back
+   later is safe.
+7. In the app's **Settings** (save with the ✓ at the top right):
    - **Name:** something people will recognise as your Zeus station, e.g.
-     `KQ4WLR Shack`. Shorter names leave more room in channel messages.
-   - **Radio settings:** exactly the same as your repeater and other devices
-     (frequency, bandwidth, spreading factor, coding rate). If they don't
-     match, the node hears nothing. Copy them from another of your devices.
-   - **Channels:** join the same public and hashtag channels your other
-     devices use, and add any private ones.
-   - Send a test message on a channel from another device and check it
-     arrives. Then the radio side is right.
-8. Disconnect the app (Bluetooth goes away in step 3 anyway).
+     `KQ4WLR Zeus`. Shorter names leave more room in channel messages.
+   - **Radio Settings → Choose Preset:** pick the same preset as your other
+     devices (in the US and Canada: **Canada, USA**, which is 910.525 MHz,
+     62.5 kHz, SF7, CR5). **Do this even if you think it's already right:**
+     freshly flashed firmware starts on its own default (915 MHz, 250 kHz,
+     SF10), which can't talk to nodes on the preset.
+   - **Transmit Power:** leave it at **10**. The V4 has a power amplifier
+     after the radio chip; 10 here already gives about 22 dBm at the antenna.
+   - **Channels:** join the same hashtag channels your other devices use,
+     and add any private ones (key or QR code from another device).
+8. **Test:** send an **Advert** from the app and check another device sees
+   `KQ4WLR Zeus`, then send a message on **Public** from another device and
+   check it arrives. Then the radio side is right.
+9. Disconnect the app (Bluetooth goes away in step 3 anyway).
 
 ## Step 2: Install the build tools (one time)
 
