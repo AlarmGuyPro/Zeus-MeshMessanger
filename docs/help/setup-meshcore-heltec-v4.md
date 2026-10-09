@@ -28,6 +28,28 @@ The plan:
    contacts, and now joins your Wi-Fi.
 3. Add it in Zeus with **Scan**.
 
+## Use the official MeshCore sources
+
+In April 2026 the MeshCore project split. The original core team (Scott
+Powell, Liam Cottle, Recrof and others) kept developing MeshCore. A former
+member, Andy Kirby, now runs a separate line called MeshOS from
+`meshcore.co.uk`. This guide uses only the core team's sources, which are
+also what Mesh Messenger is tested against:
+
+| What | Core team (use these) |
+|------|-----------------------|
+| Web flasher | `flasher.meshcore.io` |
+| Firmware source and releases | `github.com/meshcore-dev/MeshCore` |
+| Docs | `docs.meshcore.io` |
+| Phone app | **MeshCore** by Liam Cottle |
+
+Sites under `meshcore.co.uk` (including `flasher.meshcore.co.uk`) are **not**
+the core team's.
+
+**Firewalls:** `flasher.meshcore.io` is hosted in Slovakia (46.229.238.182).
+Firewalls with country or reputation blocking often block it. Allow it while
+you flash, along with GitHub, where the firmware files live.
+
 ## Which board do you have?
 
 | Board | PlatformIO environment |
