@@ -22,7 +22,8 @@ rest of the mesh through your repeaters like any other device.
 - **MeshCore:** the *companion radio Wi-Fi* build for your board
   (`heltec_v4_companion_radio_wifi` for a Heltec V4). MeshCore's Wi-Fi network
   name and password are built into this firmware, so it has to be built with
-  your network's details. A MeshCore node talks to one app at a time; if you
+  your network's details. Step by step for a Heltec V4:
+  [Set up a Heltec V4 for MeshCore](setup-meshcore-heltec-v4.md). A MeshCore node talks to one app at a time; if you
   connect your phone or meshcore-cli to it, Zeus is disconnected until they
   let go.
 

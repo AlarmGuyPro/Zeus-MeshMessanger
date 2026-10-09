@@ -4,6 +4,7 @@ Mesh Messenger lets you read and send Meshtastic and MeshCore messages from
 inside Zeus, through a LoRa node dedicated to the station.
 
 - [Getting started](getting-started.md) — the node, connecting it, first message
+- [Set up a Heltec V4 for MeshCore](setup-meshcore-heltec-v4.md) — step by step: flash, configure, put it on Wi-Fi
 - [Messages and conversations](messages.md) — the inbox, replies, delivery ticks, length limits
 - [Channels and rooms](channels-and-rooms.md) — public, hashtag and private groups; MeshCore room servers
 - [Reading signal and hops](signal.md) — what SNR, RSSI and hops tell you

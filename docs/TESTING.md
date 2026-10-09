@@ -7,10 +7,10 @@ actual replies, Wi-Fi reconnects and range.
 
 ## 1. Provision the node(s)
 
-**MeshCore (Heltec V4).** Flash the *Companion Radio — Wi-Fi* build with the
-web flasher. That build has your Wi-Fi name and password compiled in (there is
-no setup screen). If the flasher you use doesn't offer Wi-Fi fields for your
-board, build it yourself with `WIFI_SSID` / `WIFI_PWD` set. It listens on TCP port 5000. Join your channels and
+**MeshCore (Heltec V4).** Follow
+[Set up a Heltec V4 for MeshCore](help/setup-meshcore-heltec-v4.md). The Wi-Fi
+build isn't on the web flasher (the Wi-Fi details are compiled in), so it is
+built once with PlatformIO. It listens on TCP port 5000. Join your channels and
 add contacts with the MeshCore app first, then disconnect the app: the node
 serves one client at a time.
 
