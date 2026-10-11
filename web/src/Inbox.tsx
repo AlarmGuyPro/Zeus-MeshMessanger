@@ -340,9 +340,11 @@ function Thread(props: {
         >
           {muted ? "Unmute" : "Mute"}
         </button>
-        <button type="button" className={cx("button")} disabled={busy} onClick={() => setConfirmDelete(true)}>
-          Delete…
-        </button>
+        {list.length > 0 && (
+          <button type="button" className={cx("button")} disabled={busy} onClick={() => setConfirmDelete(true)}>
+            Delete…
+          </button>
+        )}
       </div>
 
       {(failedCount > 0 || notice || confirmDelete) && (
@@ -387,7 +389,13 @@ function Thread(props: {
             Couldn’t load messages: {messages.message}
           </p>
         )}
-        {messages.kind === "ready" && list.length === 0 && <p className={cx("muted")}>No messages yet.</p>}
+        {messages.kind === "ready" && list.length === 0 && (
+          <p className={cx("muted")}>
+            {conversation.kind === "channel"
+              ? "Nothing heard on this channel yet. Anything you send goes out to everyone on it."
+              : "No messages yet."}
+          </p>
+        )}
         {hasQueued && <div className={cx("divider")}>Received while Zeus was closed</div>}
         {list.map((m, i) => {
           const s = statusLine(m);

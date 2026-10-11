@@ -173,12 +173,20 @@ internal static class Endpoints
         {
             if (nodes() is not { } m) return Unavailable();
             var messages = m.Store.Messages(id, markRead ?? true);
-            return messages is null ? Results.NotFound() : Results.Ok(messages.Select(MessageToDto).ToArray());
+            // A joined channel nobody has used yet is listed but has no history: that's empty, not missing.
+            if (messages is null) return Listed(m, id) ? Results.Ok(Array.Empty<MessageDto>()) : Results.NotFound();
+            return Results.Ok(messages.Select(MessageToDto).ToArray());
         });
 
         e.MapPost("conversations/{id}/mute", (string id, MuteRequest body) =>
         {
             if (nodes() is not { } m) return Unavailable();
+            if (m.Store.SetMuted(id, body.Muted)) return Results.Ok();
+            // Muting a channel with no history yet: remember it by creating the conversation.
+            if (!Listed(m, id) || !ConversationKey.TryParse(id, out var key)) return Results.NotFound();
+            var connector = m.Router?.Connector(key.ConnectorId);
+            if (connector is null) return Results.NotFound();
+            m.Store.GetOrAdd(key, connector.Network, connector.TitleFor(key));
             return m.Store.SetMuted(id, body.Muted) ? Results.Ok() : Results.NotFound();
         });
 
@@ -193,14 +201,17 @@ internal static class Endpoints
         e.MapDelete("conversations/{id}", (string id) =>
         {
             if (nodes() is not { } m) return Unavailable();
-            return m.Store.Remove(id) ? Results.Ok() : Results.NotFound();
+            if (m.Store.Remove(id)) return Results.Ok();
+            // Nothing stored for a joined channel with no history; it stays listed because you are still joined.
+            return Listed(m, id) ? Results.Ok() : Results.NotFound();
         });
 
         e.MapPost("conversations/{id}/clear-failed", (string id) =>
         {
             if (nodes() is not { } m) return Unavailable();
             var removed = m.Store.ClearFailed(id);
-            return removed < 0 ? Results.NotFound() : Results.Ok(new ActionResultDto(true, null, removed));
+            if (removed < 0) return Listed(m, id) ? Results.Ok(new ActionResultDto(true, null, 0)) : Results.NotFound();
+            return Results.Ok(new ActionResultDto(true, null, removed));
         });
 
         e.MapPost("conversations/{id}/messages/{messageId}/retry", async (string id, string messageId, CancellationToken ct) =>
@@ -277,6 +288,11 @@ internal static class Endpoints
         });
     }
 
+    /// <summary>True when the id names a conversation Zeus shows, even if nothing is stored for it yet.</summary>
+    private static bool Listed(NodeManager m, string id) =>
+        ConversationKey.TryParse(id, out var key) && m.Router?.Connector(key.ConnectorId) is { } c &&
+        (key.Kind != ConversationKind.Channel || c.Channels.Any(ch => ch.Index.ToString() == key.Peer));
+
     private static DebugDto Debug(NodeManager m)
     {
         var connectors = (m.Router?.Connectors ?? []).ToDictionary(c => c.Id, StringComparer.Ordinal);
@@ -297,7 +313,7 @@ internal static class Endpoints
         return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
     }
 
-    private const string PluginVersion = "0.3.0";
+    private const string PluginVersion = "0.3.1";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);

@@ -173,6 +173,15 @@ public static class ApiTests
         Assert.Equal(3, channels.Count, "every joined channel listed, with no traffic yet");
         Assert.Equal("Public", channels[0]!["title"]!.GetValue<string>(), "named from the node");
 
+        // Opening a channel nobody has spoken on yet shows an empty thread, not an error.
+        var quiet = Uri.EscapeDataString(channels[2]!["id"]!.GetValue<string>());
+        Assert.Equal(0, (await host.GetAsync($"conversations/{quiet}/messages")).AsArray().Count, "empty, not 404");
+        var (muteStatus, _) = await host.PostAsync($"conversations/{quiet}/mute", new { muted = true });
+        Assert.Equal(HttpStatusCode.OK, muteStatus, "a quiet channel can be muted");
+        var (clearStatus, cleared) = await host.PostAsync($"conversations/{quiet}/clear-failed", new { });
+        Assert.Equal(HttpStatusCode.OK, clearStatus, "clearing a quiet channel is a no-op, not an error");
+        Assert.Equal(0, cleared!["count"]!.GetValue<int>(), "nothing to clear");
+
         // Posting to a channel nobody has spoken on yet must work.
         var id = Uri.EscapeDataString(channels[0]!["id"]!.GetValue<string>());
         var (_, sent) = await host.PostAsync($"conversations/{id}/reply", new { text = "net at 19:00" });
