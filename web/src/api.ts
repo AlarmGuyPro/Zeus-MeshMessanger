@@ -43,6 +43,8 @@ export interface NodeDto {
   /** MeshCore: whether the node recycles its oldest contact when the list is full. */
   recycleOldestWhenFull?: boolean;
   canAnnounce?: boolean;
+  /** True when channels can be joined and left on this node from Zeus. */
+  canEditChannels: boolean;
   pendingMove?: string;
   self?: SelfDto;
   maxDirectTextBytes: number;
@@ -268,6 +270,10 @@ export function createClient(api: ZeusPluginApi) {
     /** Clears contacts off the node. `preview` counts them instead, so nothing happens without a confirmation. */
     cleanupPeers: (nodeId: string, what: { repeaters?: boolean; notHeardDays?: number }, preview: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/peers/cleanup`, { ...what, preview }),
+    joinChannel: (nodeId: string, name: string, secret?: string) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/channels`, { name, secret }),
+    leaveChannel: (nodeId: string, index: number) =>
+      call<ActionResultDto>("DELETE", `/nodes/${enc(nodeId)}/channels/${index}`),
     setRecycleOldest: (nodeId: string, enabled: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/recycle-oldest`, { enabled }),
     debug: () => call<DebugDto>("GET", "/debug"),

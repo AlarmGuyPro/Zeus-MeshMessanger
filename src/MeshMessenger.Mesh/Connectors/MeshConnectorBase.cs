@@ -155,6 +155,14 @@ public abstract class MeshConnectorBase : IMeshConnector
     public virtual IReadOnlyList<string> ResolveSenderPeers(ConversationKind kind, string fromId, string? fromName) =>
         string.IsNullOrWhiteSpace(fromId) ? [] : [fromId];
 
+    public virtual bool CanEditChannels => false;
+
+    public virtual Task<string?> JoinChannelAsync(string name, string? secretHex, CancellationToken ct) =>
+        Task.FromResult<string?>("This node's channels can't be changed from Zeus.");
+
+    public virtual Task<string?> LeaveChannelAsync(int index, CancellationToken ct) =>
+        Task.FromResult<string?>("This node's channels can't be changed from Zeus.");
+
     public virtual int? PeerCapacity => null;
 
     public virtual bool? RecycleOldestWhenFull => null;

@@ -26,6 +26,13 @@ public sealed class StubConnector(string id, MeshNetwork network) : IMeshConnect
     }
     public Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
 
+    public bool CanEditChannels => false;
+
+    public Task<string?> JoinChannelAsync(string name, string? secretHex, CancellationToken ct) =>
+        Task.FromResult<string?>("not supported");
+
+    public Task<string?> LeaveChannelAsync(int index, CancellationToken ct) => Task.FromResult<string?>("not supported");
+
     public IReadOnlyList<string> ResolveSenderPeers(ConversationKind kind, string fromId, string? fromName) =>
         string.IsNullOrWhiteSpace(fromId) ? [] : [fromId];
     public int? PeerCapacity => null;

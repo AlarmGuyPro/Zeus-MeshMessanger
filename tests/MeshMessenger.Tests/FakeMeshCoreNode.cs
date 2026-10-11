@@ -253,6 +253,22 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 await WriteAsync(s, f);
                 break;
             }
+            case CmdSetChannel:
+            {
+                var i = cmd[1];
+                if (i >= Math.Max(8, ChannelSlots.Count))
+                {
+                    await WriteAsync(s, [RespErr, 2]);
+                    break;
+                }
+                var name = Encoding.UTF8.GetString(cmd.AsSpan(2, 32)).TrimEnd('\0');
+                var secret = cmd.AsSpan(34, 16).ToArray();
+                while (ChannelSlots.Count <= i) ChannelSlots.Add(("", new byte[16]));
+                ChannelSlots[i] = (name, secret);
+                Received.Enqueue(cmd);
+                await WriteAsync(s, [RespOk]);
+                break;
+            }
             case CmdSyncNextMessage:
                 await WriteAsync(s, _queue.TryDequeue(out var m) ? m : [RespNoMoreMessages]);
                 break;

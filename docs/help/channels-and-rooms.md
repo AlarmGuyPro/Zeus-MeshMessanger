@@ -9,21 +9,36 @@ private is its key.
 |---|---|---|
 | **Public** | Anyone | Meshtastic: the default channel. MeshCore: the Public channel. |
 | **Hashtag** (MeshCore) | Anyone who knows or guesses the name — the key is made from the name | Type the name, e.g. `#denver` |
-| **Private** | Only people you give the key to | Paste a share link (Meshtastic) or the name and key (MeshCore) |
+| **Private** | Only people you give the key to | MeshCore: the name and its key. Meshtastic: in the Meshtastic app. |
 
 Your node has a fixed number of channel slots (Meshtastic 8, MeshCore up to
 40 on the Heltec V4 Wi-Fi build). Joining uses a slot; leaving frees it.
 Joining and leaving change the channel list **on your node**, so they apply
 even when Zeus is closed. Neither one transmits anything.
 
-**Meshtastic share links** can also carry radio settings (region, preset).
-Mesh Messenger only adds the channels and ignores those settings; if the
-link's preset differs from your node's, you're warned, because you won't hear
-that group until the presets match (change that in the Meshtastic app if you
-really want to).
+## Joining and leaving (MeshCore)
 
-**Sharing a private channel:** *Show key* displays the link or key and a QR
-code. Anyone who has it can read and post to the channel.
+On the **Nodes** tab, under **Channels**:
+
+- **Join a channel** takes a name and, for anything that isn't a `#` name, a
+  key of 32 hex characters.
+- A name starting with `#` makes its own key out of the name, so everyone who
+  types `#denver` is on the same channel without exchanging anything. That is
+  what makes hashtag channels open: the name *is* the key.
+- Any other channel needs its key from whoever runs it. There is no way to
+  work it out from the name, which is the point.
+- **Leave…** clears the slot, with a confirmation. Messages already in Zeus
+  are kept; you simply stop hearing new ones.
+
+Slot 0 is the node's primary channel and Zeus won't clear it — a node needs
+somewhere to put ordinary traffic. Change that in the MeshCore app if you
+really mean to.
+
+If the node has no free slot, leave a channel you don't read before joining
+another.
+
+**Meshtastic channels are set in the Meshtastic app**, not from Zeus. Zeus
+lists them and lets you read and post, but doesn't add or remove them.
 
 ## Rooms (MeshCore only)
 

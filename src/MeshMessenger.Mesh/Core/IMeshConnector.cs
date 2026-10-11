@@ -67,6 +67,20 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Marks a contact as a favourite on the node so it is never recycled.</summary>
     Task<string?> SetPeerFavouriteAsync(string peerId, bool favourite, CancellationToken ct);
 
+    /// <summary>True when channels can be joined and left on this node from Zeus.</summary>
+    bool CanEditChannels { get; }
+
+    /// <summary>
+    /// Puts a channel in the node's first free slot. A name beginning with '#'
+    /// derives its own key; anything else needs <paramref name="secretHex"/>,
+    /// the key shared by whoever runs the channel. Local to the node; transmits
+    /// nothing. Returns null on success, or the reason it couldn't.
+    /// </summary>
+    Task<string?> JoinChannelAsync(string name, string? secretHex, CancellationToken ct);
+
+    /// <summary>Clears a channel slot on the node. Local; transmits nothing.</summary>
+    Task<string?> LeaveChannelAsync(int index, CancellationToken ct);
+
     IReadOnlyList<ChannelInfo> Channels { get; }
 
     /// <summary>

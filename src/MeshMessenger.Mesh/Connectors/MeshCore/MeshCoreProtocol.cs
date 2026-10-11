@@ -95,6 +95,31 @@ public static class MeshCoreProtocol
 
     public static byte[] GetChannel(int index) => [CmdGetChannel, (byte)index];
 
+    /// <summary>
+    /// Writes a channel into a slot: 32 bytes of name then the 128-bit key.
+    /// An empty name with a zero key clears the slot, which is how you leave.
+    /// Local to the node; nothing goes out on the air.
+    /// </summary>
+    public static byte[] SetChannel(int index, string name, ReadOnlySpan<byte> secret16)
+    {
+        var b = new byte[2 + 32 + 16];
+        b[0] = CmdSetChannel;
+        b[1] = (byte)index;
+        var bytes = Encoding.UTF8.GetBytes(name);
+        // The firmware strncpy's 32 bytes and needs room for the terminator.
+        bytes.AsSpan(0, Math.Min(bytes.Length, 31)).CopyTo(b.AsSpan(2));
+        secret16[..Math.Min(secret16.Length, 16)].CopyTo(b.AsSpan(34));
+        return b;
+    }
+
+    /// <summary>
+    /// A "#name" channel's key is derived from the name itself, so two people
+    /// who type the same name are on the same channel without exchanging
+    /// anything. Any other channel needs its key shared out of band.
+    /// </summary>
+    public static byte[] DerivedChannelKey(string hashtagName) =>
+        SHA256.HashData(Encoding.UTF8.GetBytes(hashtagName)).AsSpan(0, 16).ToArray();
+
     public static byte[] SyncNextMessage() => [CmdSyncNextMessage];
 
     public static byte[] GetBattery() => [CmdGetBattAndStorage];

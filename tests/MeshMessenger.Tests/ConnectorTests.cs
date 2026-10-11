@@ -3,6 +3,8 @@ using MeshMessenger.Connectors;
 using MeshMessenger.Connectors.MeshCore;
 using MeshMessenger.Connectors.Meshtastic;
 using MeshMessenger.Core;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MeshMessenger.Tests;
 
@@ -100,6 +102,45 @@ public static class ConnectorTests
         // A room post is signed, so the id is real — but only if we hold it.
         Assert.Equal(1, c.ResolveSenderPeers(ConversationKind.Room, hex, "KE0XYZ Mobile").Count, "known room author resolves");
         Assert.Equal(0, c.ResolveSenderPeers(ConversationKind.Room, "deadbeef", null).Count, "unheld room author does not");
+    }
+
+    /// <summary>
+    /// Joining a channel writes a name and a 128-bit key into a free slot. A
+    /// "#name" channel must derive the same key everyone else derives, or two
+    /// people typing the same name end up on different channels and never find
+    /// out. Anything else needs its key given, and the primary slot is not
+    /// something Zeus will clear.
+    /// </summary>
+    [Test]
+    public static async Task MeshCoreJoinsAndLeavesChannelsAndDerivesTheHashtagKey()
+    {
+        await using var node = new FakeMeshCoreNode();
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        Assert.Equal(3, c.Channels.Count, "three channels to start");
+
+        // A name with no '#' and no key is not a channel anyone could share.
+        Assert.Contains("needs its key", await c.JoinChannelAsync("Neighbours", null, default) ?? "", "plain name refused");
+        Assert.Contains("32 hex", await c.JoinChannelAsync("Neighbours", "nonsense", default) ?? "", "bad key refused");
+
+        Assert.Equal(null, await c.JoinChannelAsync("#testing", null, default), "hashtag channel joined");
+        await Assert.Eventually(() => c.Channels.Count == 4, "channel appears");
+        var joined = node.ChannelSlots[3];
+        Assert.Equal("#testing", joined.Name, "name written to the first free slot");
+        var expected = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("#testing")).AsSpan(0, 16));
+        Assert.Equal(expected, Convert.ToHexString(joined.Secret), "key derived from the name, like every other client");
+
+        // Joining the same channel twice would waste a slot and confuse the inbox.
+        Assert.Contains("Already joined", await c.JoinChannelAsync("#testing", null, default) ?? "", "duplicate refused");
+
+        // The primary channel is where ordinary traffic goes; Zeus won't strand the node.
+        Assert.Contains("primary", await c.LeaveChannelAsync(0, default) ?? "", "slot 0 protected");
+
+        Assert.Equal(null, await c.LeaveChannelAsync(3, default), "left the channel");
+        await Assert.Eventually(() => c.Channels.Count == 3, "channel gone");
+        Assert.Equal("", node.ChannelSlots[3].Name, "slot cleared on the node");
+        Assert.True(node.ChannelSlots[3].Secret.All(b => b == 0), "key cleared too");
     }
 
     [Test]

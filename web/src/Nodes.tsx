@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
-import { ago, errorText, peerKindLabel, type Client, type NodeDto, type PeerDto } from "./api";
+import { ago, channelKindLabel, errorText, peerKindLabel, type Client, type NodeDto, type PeerDto } from "./api";
 import { NetworkBadge, NodeState, usePoll } from "./Panel";
 import { cx } from "./styles";
 
@@ -33,6 +33,162 @@ function heardTitle(p: PeerDto): string {
 }
 
 /** Heard nodes / contacts for each of our nodes. */
+/**
+ * The channels a node is listening on, and joining or leaving one. A MeshCore
+ * channel is just a name and a 128-bit key held in one of the node's slots: a
+ * "#name" channel derives its key from the name, so anyone who types the same
+ * name lands on the same channel, while any other channel's key has to be
+ * shared out of band. Nothing here transmits.
+ */
+function Channels({ client, node, onChanged }: { client: Client; node: NodeDto; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState<number | null>(null);
+  const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
+
+  if (!node.canEditChannels) {
+    return (
+      <p className={cx("help")}>
+        This node is listening on {node.channels.length} channel{node.channels.length === 1 ? "" : "s"}. Meshtastic
+        channels are set in the Meshtastic app, not from Zeus.
+      </p>
+    );
+  }
+
+  const needsKey = name.trim().length > 0 && !name.trim().startsWith("#");
+  const join = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await client.joinChannel(node.id, name.trim(), secret.trim() || undefined);
+      if (result.ok) {
+        setNote({ kind: "ok", text: `Joined ${name.trim()}.` });
+        setName("");
+        setSecret("");
+        setOpen(false);
+      } else {
+        setNote({ kind: "warn", text: result.error ?? "Couldn’t join it." });
+      }
+      onChanged();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const leave = async (index: number, label: string) => {
+    setLeaving(null);
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await client.leaveChannel(node.id, index);
+      setNote(
+        result.ok
+          ? { kind: "ok", text: `Left ${label}. Messages already in Zeus are kept.` }
+          : { kind: "warn", text: result.error ?? "Couldn’t leave it." },
+      );
+      onChanged();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={cx("row")}>
+        <strong>Channels</strong>
+        <span className={cx("grow")} />
+        <span className={cx("tx-label")}>Transmits: no</span>
+        <button type="button" className={cx("button")} disabled={busy} onClick={() => setOpen(!open)}>
+          {open ? "Cancel" : "Join a channel"}
+        </button>
+      </div>
+
+      {open && (
+        <>
+          <label className={cx("field")}>
+            <span>Channel name</span>
+            <input
+              className={cx("input")}
+              value={name}
+              placeholder="#denver, or a name you were given"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className={cx("field")}>
+            <span>Key {needsKey ? "(required)" : "(not needed for a # channel)"}</span>
+            <input
+              className={`${cx("input")} ${cx("mono")}`}
+              value={secret}
+              placeholder="32 hex characters"
+              onChange={(e) => setSecret(e.target.value)}
+            />
+          </label>
+          <p className={cx("help")}>
+            A name starting with <strong>#</strong> makes its own key from the name, so everyone who types the same
+            name is on the same channel — that is how open local channels work. Any other channel needs its key, which
+            whoever runs it has to give you.
+          </p>
+          <div className={cx("row")}>
+            <button
+              type="button"
+              className={`${cx("button")} ${cx("button--primary")}`}
+              disabled={busy || name.trim().length === 0 || (needsKey && secret.trim().length === 0)}
+              onClick={() => void join()}
+            >
+              {busy ? "Joining…" : "Join"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {note && (
+        <p className={note.kind === "warn" ? `${cx("notice")} ${cx("notice--warn")}` : cx("help")} role="status">
+          {note.text}
+        </p>
+      )}
+
+      <ul className={cx("log")}>
+        {node.channels.map((ch) => (
+          <li key={ch.index} className={cx("row")}>
+            <span className={cx("chip")}>{ch.index}</span>
+            <strong>{ch.name}</strong>
+            <span className={cx("muted")}>{channelKindLabel[ch.kind] ?? ch.kind}</span>
+            <span className={cx("grow")} />
+            {ch.index === 0 ? (
+              <span className={cx("muted")}>Primary</span>
+            ) : leaving === ch.index ? (
+              <>
+                <span className={cx("warn")}>Leave {ch.name}?</span>
+                <button
+                  type="button"
+                  className={`${cx("button")} ${cx("button--primary")}`}
+                  disabled={busy}
+                  onClick={() => void leave(ch.index, ch.name)}
+                >
+                  Leave
+                </button>
+                <button type="button" className={cx("button")} disabled={busy} onClick={() => setLeaving(null)}>
+                  Stay
+                </button>
+              </>
+            ) : (
+              <button type="button" className={cx("button")} disabled={busy} onClick={() => setLeaving(ch.index)}>
+                Leave…
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 /** Which contacts a tidy-up would clear off the node. */
 interface CleanupWhat {
   repeaters?: boolean;
@@ -280,6 +436,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
             </p>
           </>
         )}
+
+        <Channels client={client} node={node} onChanged={onChanged} />
 
         {capacity !== undefined && capacity !== null && all.length > 0 && (
           <>

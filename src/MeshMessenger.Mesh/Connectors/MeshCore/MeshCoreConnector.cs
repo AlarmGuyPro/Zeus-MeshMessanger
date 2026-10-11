@@ -599,6 +599,91 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         }
     }
 
+    public override bool CanEditChannels => true;
+
+    public override async Task<string?> JoinChannelAsync(string name, string? secretHex, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        name = (name ?? "").Trim();
+        if (name.Length == 0) return "Give the channel a name.";
+        if (Encoding.UTF8.GetByteCount(name) > 31) return "That name is too long for the node (31 bytes).";
+
+        byte[] secret;
+        var hex = (secretHex ?? "").Replace(" ", "").Replace("-", "");
+        if (hex.Length > 0)
+        {
+            // 128-bit keys only: that is all the companion protocol carries.
+            if (hex.Length != 32 || !hex.All(Uri.IsHexDigit)) return "A channel key is 32 hex characters.";
+            secret = Convert.FromHexString(hex);
+        }
+        else if (name.StartsWith('#'))
+        {
+            secret = DerivedChannelKey(name);
+        }
+        else
+        {
+            return "A channel name that doesn't start with # needs its key as well.";
+        }
+
+        List<ChannelSlot> slots;
+        lock (_gate) slots = [.. _slots];
+        if (slots.FirstOrDefault(s => s.Secret.AsSpan().SequenceEqual(secret)) is { } already)
+        {
+            return $"Already joined, as \"{already.Name}\" in slot {already.Index}.";
+        }
+        if (slots.FirstOrDefault(s => s.IsEmpty) is not { } free)
+        {
+            return "The node has no free channel slot. Leave one first.";
+        }
+
+        try
+        {
+            await CommandAsync(SetChannel(free.Index, name, secret), c => c is RespOk, ct).ConfigureAwait(false);
+            Log(LogLevel.Info, $"Joined channel \"{name}\" in slot {free.Index}.");
+            await LoadChannelsAsync(slots.Count, ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Joining \"{name}\" failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
+        }
+    }
+
+    public override async Task<string?> LeaveChannelAsync(int index, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        // Slot 0 is the node's primary channel. Clearing it from here would
+        // leave the node with nowhere to put ordinary traffic, and the operator
+        // would have no obvious way back; the MeshCore app can still do it.
+        if (index == 0) return "Slot 0 is the node's primary channel and can't be cleared from Zeus.";
+        List<ChannelSlot> slots;
+        lock (_gate) slots = [.. _slots];
+        var slot = slots.FirstOrDefault(s => s.Index == index);
+        if (slot is null || slot.IsEmpty) return "That slot is already empty.";
+
+        try
+        {
+            await CommandAsync(SetChannel(index, "", new byte[16]), c => c is RespOk, ct).ConfigureAwait(false);
+            Log(LogLevel.Info, $"Left channel \"{slot.Name}\" (slot {index}).");
+            await LoadChannelsAsync(slots.Count, ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Leaving \"{slot.Name}\" failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
+        }
+    }
+
     public override async Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct)
     {
         if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";

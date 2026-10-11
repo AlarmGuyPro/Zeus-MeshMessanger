@@ -27,6 +27,9 @@ so it costs the whole mesh airtime, not just yours.
 | Enabled | Off disconnects Zeus from the node without deleting its conversations. | No | On |
 | Recycle the oldest contact when the list is full (MeshCore) | A setting on the node. With it on, the node drops its oldest non-favourite contact to make room for a new one, so a full list never blocks new stations. With it off, a full list stays full and direct messages to new stations fail. | No | Off (the node's own default) |
 | Remove (a contact, MeshCore) | Deletes that contact from the node's list, freeing a slot. | No | — |
+| ☆ (a contact, MeshCore) | Marks the contact a favourite on the node. Favourites are never recycled and never swept up by a tidy-up. | No | Off |
+| Remove all repeaters (MeshCore) | Clears every repeater off the node in one go. Counts them and asks first. Favourites are kept. | No | — |
+| Remove any not heard in 7 / 30 / 90 days (MeshCore) | Clears stations that have gone quiet. Counts them and asks first. Favourites, room servers, and any station whose age the node doesn't report are kept. | No | 30 days |
 | ☆ Favourite (a contact, MeshCore) | Marks the contact on the node so recycling never drops it. Use it for the stations you actually message. | No | Off |
 | Show repeaters | Repeaters are hidden from the Nodes list by default because a busy mesh has hundreds. Search always finds them whether or not this is ticked. | No | Off |
 | Re-read from node | Asks the node for its contact or node list again. Useful after adding a contact in the phone app. | No | — |
@@ -53,16 +56,18 @@ the node itself, not a transmission.
 
 ## Channels
 
+MeshCore only: Meshtastic channels are set in the Meshtastic app, and Zeus
+lists them without changing them.
+
 | Option | What it does | Transmits | Default |
 |---|---|---|---|
-| Join public / hashtag channel | Adds the channel to a free slot on your node. Anyone who knows (or guesses) a hashtag name can read it. | No | — |
-| Join private channel (link or key) | Adds a private channel from a share link (Meshtastic) or name + key (MeshCore). For Meshtastic links, only the channel is added: radio settings in the link are ignored, and you're warned if they differ from your node's. | No | — |
-| Create private channel | Makes a new random key and shows a link / QR code to share. | No | — |
-| Show key | Displays the channel key so you can share it. Anyone with the key can read the channel. | No | Hidden |
-| Leave channel | Frees the slot on your node. You stop receiving it. | No | — |
+| Join a channel: name | A name starting with `#` makes its own key from the name, so anyone who types the same name is on the same channel. | No | — |
+| Join a channel: key | 32 hex characters. Required for any name that doesn't start with `#`; ignored for one that does. | No | — |
+| Leave… | Frees the slot on your node, after a confirmation. You stop receiving that channel; messages already in Zeus are kept. | No | — |
 
 Joining or leaving changes your **node's** channel list, so your node stops or
-starts hearing that channel even when Zeus is closed.
+starts hearing that channel even when Zeus is closed. Slot 0 is the node's
+primary channel and can't be cleared from Zeus.
 
 ## Rooms (MeshCore room servers)
 
