@@ -6,6 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
+| [v0.4.1](v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip) | main | Meshtastic node no longer reports a full contact list |
 | [v0.4.0](v0.4.0/io.github.alarmguypro.meshmessenger-0.4.0.zip) | main @ 205655b | Message a channel sender, tidy contacts, join/leave MeshCore channels |
 | [v0.3.1](v0.3.1/io.github.alarmguypro.meshmessenger-0.3.1.zip) | main | Fix 404 on a quiet joined channel |
 | [v0.3.0](v0.3.0/io.github.alarmguypro.meshmessenger-0.3.0.zip) | main | Searchable pickers, folders, favourites |
