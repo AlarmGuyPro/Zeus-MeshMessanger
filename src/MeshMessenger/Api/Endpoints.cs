@@ -382,7 +382,7 @@ internal static class Endpoints
         return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
     }
 
-    private const string PluginVersion = "0.4.0";
+    private const string PluginVersion = "0.4.1";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);

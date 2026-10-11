@@ -15,12 +15,23 @@ function matches(p: PeerDto, needle: string): boolean {
 }
 
 /**
+ * When to show in the Updated column. MeshCore keeps a time of its own for when
+ * our node last changed the record, which is the one to trust. Meshtastic keeps
+ * no such thing, so there the only time available is when the station was last
+ * heard — without this fallback the column was empty on every Meshtastic node.
+ */
+function updatedAt(p: PeerDto): string | undefined {
+  return p.lastUpdated ?? p.lastHeard;
+}
+
+/**
  * The tooltip for the Updated column. MeshCore stores two times: when our node
  * last changed the record, and the timestamp the OTHER station put in its advert
  * by its own clock, which is often wrong and sometimes in the future.
  */
 function heardTitle(p: PeerDto): string {
   const parts: string[] = [];
+  if (!p.lastUpdated && p.lastHeard) return `Last heard ${new Date(p.lastHeard).toLocaleString()}`;
   parts.push(p.lastUpdated ? `Your node updated this record ${new Date(p.lastUpdated).toLocaleString()}` : "Your node hasn't recorded an update time");
   if (p.lastHeard) {
     const advert = new Date(p.lastHeard);
@@ -219,8 +230,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
     const visible = needle || showRepeaters ? found : found.filter((p) => p.kind !== "repeater");
     return [...visible].sort((a, b) => {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
-      const at = a.lastUpdated ? Date.parse(a.lastUpdated) : 0;
-      const bt = b.lastUpdated ? Date.parse(b.lastUpdated) : 0;
+      const at = updatedAt(a) ? Date.parse(updatedAt(a)!) : 0;
+      const bt = updatedAt(b) ? Date.parse(updatedAt(b)!) : 0;
       if (bt !== at) return bt - at;
       return a.name.localeCompare(b.name);
     });
@@ -234,7 +245,11 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
   const saved = all.filter((p) => p.savedOnNode).length;
   const recycling = node?.recycleOldestWhenFull === true;
   // With recycling on, a full list is the normal steady state, not a fault.
-  const blocked = capacity !== undefined && saved >= capacity && !recycling;
+  // Meshtastic reports no capacity at all, and the API sends that as null
+  // rather than omitting it. Treating null as a number made every Meshtastic
+  // node look like a contact list that was full at zero.
+  const hasCapacity = capacity !== undefined && capacity !== null;
+  const blocked = hasCapacity && saved >= capacity && !recycling;
 
   const star = async (peerId: string, name: string, favourite: boolean) => {
     setStarring(peerId);
@@ -389,8 +404,16 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         </div>
         <p className={cx("help")}>
           <strong>Re-read from node</strong> asks the node for its contact list again, which helps after adding a
-          contact from the phone app. <strong>Send advert</strong> announces this node on the air so other stations can
-          add it and message you; it is the only button here that transmits.
+          contact from the phone app.
+          {node.network === "meshcore" ? (
+            <>
+              {" "}
+              <strong>Send advert</strong> announces this node on the air so other stations can add it and message you;
+              it is the only button here that transmits.
+            </>
+          ) : (
+            " Nothing on this tab transmits."
+          )}
         </p>
         {note && (
           <p className={`${cx("notice")} ${note.kind === "warn" ? cx("notice--warn") : ""}`} role="status">
@@ -439,7 +462,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
 
         <Channels client={client} node={node} onChanged={onChanged} />
 
-        {capacity !== undefined && capacity !== null && all.length > 0 && (
+        {hasCapacity && all.length > 0 && (
           <>
             <div className={cx("row")}>
               <strong>Tidy the list</strong>
@@ -529,8 +552,14 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         )}
         {peers.kind === "ready" && all.length === 0 && (
           <p className={cx("muted")}>
-            None yet. Ask another station to send an advert, or press <strong>Send advert</strong> so they can add this
-            node and reply.
+            {node.network === "meshcore" ? (
+              <>
+                None yet. Ask another station to send an advert, or press <strong>Send advert</strong> so they can add
+                this node and reply.
+              </>
+            ) : (
+              "None yet. Meshtastic nodes announce themselves regularly, so this fills in on its own once one is in range."
+            )}
           </p>
         )}
         {peers.kind === "ready" && all.length > 0 && list.length === 0 && (
@@ -540,8 +569,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
           <>
             <p className={cx("help")}>
               Showing {list.length} of {all.length}
-              {capacity !== undefined ? ` · ${saved} of ${capacity} contact slots used` : ""}
-              {capacity !== undefined ? (recycling ? " · recycling on" : " · recycling off") : ""}.
+              {hasCapacity ? ` · ${saved} of ${capacity} contact slots used` : ""}
+              {hasCapacity ? (recycling ? " · recycling on" : " · recycling off") : ""}.
             </p>
             <div className={cx("scroll-x")}>
               <table className={cx("table")}>
@@ -594,7 +623,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                       </td>
                       <td>{peerKindLabel[p.kind] ?? p.kind}</td>
                       <td className={cx("mono")} title={heardTitle(p)}>
-                        {ago(p.lastUpdated)}
+                        {ago(updatedAt(p))}
                       </td>
                       <td
                         className={`${cx("num")} ${p.snr !== undefined && p.snr !== null && p.snr < -10 ? cx("warn") : ""}`}
