@@ -12,12 +12,10 @@
     <ProjectReference Include="../../sdk/Zeussdr.Zeus.Plugins.Contracts/Zeus.Plugins.Contracts.csproj"
                       Private="false" />
   </ItemGroup>
-  <!-- The mesh library is compiled into the plugin so the package ships one
-       assembly (the catalog scan asks reviewers to check every extra DLL).
-       MeshMessenger.Mesh.csproj still builds it alone for the future gateway. -->
-  <ItemGroup>
-    <Compile Include="../MeshMessenger.Mesh/**/*.cs"
-             Exclude="../MeshMessenger.Mesh/bin/**;../MeshMessenger.Mesh/obj/**"
-             LinkBase="Mesh" />
-  </ItemGroup>
+  <!-- The mesh library lives under Mesh/ inside this project rather than in a
+       project of its own. Two reasons: the package then ships one assembly,
+       which the catalog scan prefers (every extra DLL is flagged for a
+       reviewer), and the source-rebuild check allows neither '..' in an item
+       path nor LinkBase metadata, which is what linking it in from a sibling
+       project required. Default globbing picks it up; no Compile items needed. -->
 </Project>

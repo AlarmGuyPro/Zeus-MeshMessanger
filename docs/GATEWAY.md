@@ -24,7 +24,7 @@ Zeus ── MeshMessenger plugin ── Gateway connector ──HTTP (LAN, token
                                                                            └─ Meshtastic node (USB or Wi-Fi)
 ```
 
-- **Same protocol code.** `src/MeshMessenger.Mesh` (connectors, routing,
+- **Same protocol code.** `src/MeshMessenger/Mesh` (connectors, routing,
   transmit coordinator) has no Zeus dependency. The plugin and the gateway
   both host it. The plugin's third connector type, `Gateway`, talks to the
   gateway instead of a node.
@@ -115,7 +115,7 @@ The script:
 ## Repository layout
 
 ```
-src/MeshMessenger.Mesh/      shared library: core + connectors (no Zeus, no ASP.NET)
+src/MeshMessenger/Mesh/     mesh code: core + connectors (no Zeus, no ASP.NET)
 src/MeshMessenger/           Zeus plugin (entrypoint), references the library
 src/MeshGateway/             gateway service (future), references the library
 tests/MeshMessenger.Tests/   console test runner, no packages (future)

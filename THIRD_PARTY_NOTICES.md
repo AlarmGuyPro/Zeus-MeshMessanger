@@ -6,7 +6,7 @@ from or built against.
 
 ## Mesh Messenger's own earlier work
 
-- `src/MeshMessenger.Mesh/Discovery/` (`Mdns.cs`, `Ipv4Network.cs`,
+- `src/MeshMessenger/Mesh/Discovery/` (`Mdns.cs`, `Ipv4Network.cs`,
   `HostValidator.cs`) is adapted from the same author's Zeus-PowerStation
   feature, <https://github.com/AlarmGuyPro/zeus-powerstation> (commit
   `c9c984d`), originally GPL-2.0-or-later and relicensed here under

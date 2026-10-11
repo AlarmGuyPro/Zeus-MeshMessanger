@@ -40,7 +40,7 @@ Zeus panel (web/)  ──callBackend──▶  Endpoints  ──▶  MessageRout
 
 ## Code layout
 
-- `src/MeshMessenger.Mesh/` — conversation model, routing, store and the
+- `src/MeshMessenger/Mesh/` — conversation model, routing, store and the
   Meshtastic / MeshCore connectors. No Zeus or ASP.NET dependency, so the
   optional Pi gateway ([docs/GATEWAY.md](docs/GATEWAY.md)) can reuse it.
 - `src/MeshMessenger/` — the Zeus plugin: lifecycle, settings, HTTP endpoints.

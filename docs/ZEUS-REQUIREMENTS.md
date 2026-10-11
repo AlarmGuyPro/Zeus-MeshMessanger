@@ -45,7 +45,7 @@ leak in Mesh Messenger is a crash or leak in Zeus.
 | Network use is LAN-only and explainable | Connect only to configured or discovered nodes on private addresses; **refuse public IP addresses**. Discovery (mDNS + a probe of ports 4403/5000 on private ranges, identity-confirmed) runs only on Scan, at setup, or to re-find a paired node — described exactly in docs/DISCOVERY.md and the PR. No internet calls, no update checks, no telemetry. |
 | No secrets in logs or URLs | Channel keys and room passwords never logged, never in query strings, returned only by an explicit "show key" action. |
 | No host internals | No `[FromServices]`, `HttpContext.RequestServices`, environment variables, reflection or `HostDataDirectory` (scan rules `host-services`, `environment`, `reflection`, `host-data`). |
-| Scanner findings we will explain in the PR | Bundled `MeshMessenger.Mesh.dll` (`unexpected-assembly-ref`, review), the `meshtastic.org` share-URL prefix (`public-endpoint`, review). |
+| Scanner findings we will explain in the PR | None outstanding: the package ships a single assembly and the latest scan is CLEAR (0 fail, 0 review). The mesh code is compiled into `MeshMessenger.dll` from `src/MeshMessenger/Mesh/` rather than bundled as a second DLL, which also keeps the source-rebuild check happy — it allows neither `..` in an item path nor `LinkBase`. |
 
 ## 4. Build, package and review
 
