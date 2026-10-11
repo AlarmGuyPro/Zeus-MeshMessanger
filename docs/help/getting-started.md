@@ -16,9 +16,11 @@ rest of the mesh through your repeaters like any other device.
 
 ## 2. Firmware
 
-- **Meshtastic:** any recent firmware. Turn on Wi-Fi in the node's network
-  settings with the official app. (On ESP32 boards, turning on Wi-Fi turns off
-  Bluetooth, which is fine for a dedicated node.)
+- **Meshtastic:** any recent firmware. Set the region (a node won't transmit
+  until you do), then turn on Wi-Fi in the node's network settings. (On ESP32
+  boards, turning on Wi-Fi turns off Bluetooth, which is fine for a dedicated
+  node.) Step by step for a Heltec V4, including what to do when Wi-Fi won't
+  connect: [Set up a Heltec V4 for Meshtastic](setup-meshtastic-heltec-v4.md).
 - **MeshCore:** the *companion radio Wi-Fi* build for your board
   (`heltec_v4_companion_radio_wifi` for a Heltec V4). MeshCore's Wi-Fi network
   name and password are built into this firmware, so it has to be built with

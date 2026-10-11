@@ -113,3 +113,10 @@ firewall between them. If the node is on another network, add that range under
 
 A MeshCore node serves **one** connection at a time. If meshcore-cli or
 another tool is connected, Zeus waits and reconnects when it lets go.
+
+Careful with ping as evidence: a router or access point can answer ICMP on
+behalf of a client it still has in its table, so a node that is **not** on the
+network can still reply. If ping succeeds but the port doesn't open, believe
+the port. For a Meshtastic node that won't join Wi-Fi at all, work through
+[Set up a Heltec V4 for Meshtastic](setup-meshtastic-heltec-v4.md), which
+covers reading the node's own serial log and what each failure reason means.
