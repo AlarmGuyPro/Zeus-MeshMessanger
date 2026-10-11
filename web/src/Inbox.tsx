@@ -30,8 +30,19 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
   const [list] = usePoll(() => client.conversations(), 2000, [client, status.version]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composingNew, setComposingNew] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const conversations = list.kind === "ready" ? list.data : [];
+  const everything = list.kind === "ready" ? list.data : [];
+  const needle = search.trim().toLowerCase();
+  const conversations = needle
+    ? everything.filter(
+        (c) =>
+          conversationTitle(c).toLowerCase().includes(needle) ||
+          c.peer.toLowerCase().includes(needle) ||
+          (c.last?.text ?? "").toLowerCase().includes(needle) ||
+          (c.last?.fromName ?? "").toLowerCase().includes(needle),
+      )
+    : everything;
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
   const nodeById = useMemo(() => new Map(status.nodes.map((n) => [n.id, n])), [status.nodes]);
   const bodyMode = selected || composingNew ? "thread" : "list";
@@ -50,13 +61,26 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
           >
             New message
           </button>
+          {everything.length > 3 && (
+            <input
+              className={cx("input")}
+              style={{ marginTop: 8 }}
+              value={search}
+              placeholder="Search conversations"
+              aria-label="Search conversations"
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          )}
         </div>
         {list.kind === "error" && (
           <p className={`${cx("notice")} ${cx("notice--warn")}`} role="alert">
             Couldn’t load conversations: {list.message}
           </p>
         )}
-        {list.kind === "ready" && conversations.length === 0 && <p className={cx("notice")}>No messages yet.</p>}
+        {list.kind === "ready" && everything.length === 0 && <p className={cx("notice")}>No messages yet.</p>}
+        {list.kind === "ready" && everything.length > 0 && conversations.length === 0 && (
+          <p className={cx("notice")}>Nothing matches “{search}”.</p>
+        )}
         <ul aria-label="Conversations" style={{ margin: 0, padding: 0, listStyle: "none" }}>
           {conversations.map((c) => {
             const node = nodeById.get(c.connectorId);
@@ -109,6 +133,7 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
           node={nodeById.get(selected.connectorId) ?? null}
           version={status.version}
           onBack={() => setSelectedId(null)}
+          onDeleted={() => setSelectedId(null)}
         />
       ) : (
         <div className={cx("thread")}>
@@ -154,13 +179,22 @@ function Thread(props: {
   node: NodeDto | null;
   version: number;
   onBack: () => void;
+  onDeleted: () => void;
 }) {
   const { client, conversation, node } = props;
-  const [messages] = usePoll(() => client.messages(conversation.id), 2000, [client, conversation.id, props.version]);
+  const [messages, reload] = usePoll(() => client.messages(conversation.id), 2000, [
+    client,
+    conversation.id,
+    props.version,
+  ]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [muted, setMuted] = useState(conversation.muted);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   const bytes = utf8Length(draft.trim());
   const max = node ? textLimit(node, conversation.kind) : 0;
@@ -187,6 +221,48 @@ function Thread(props: {
   const list = messages.kind === "ready" ? messages.data : [];
   const firstLive = list.findIndex((m) => !m.queuedWhileAway);
   const hasQueued = list.some((m) => m.queuedWhileAway);
+  const failedCount = list.filter(
+    (m) => m.direction === "outbound" && (m.status === "failed" || m.status === "notconfirmed"),
+  ).length;
+
+  const retry = async (messageId: string) => {
+    setRetrying(messageId);
+    setNotice(null);
+    try {
+      const result = await client.retry(conversation.id, messageId);
+      if (!result.ok) setNotice(result.error ?? "Still couldn’t send it.");
+      reload();
+    } catch (err) {
+      setNotice(errorText(err));
+    } finally {
+      setRetrying(null);
+    }
+  };
+
+  const clearFailed = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await client.clearFailed(conversation.id);
+      setNotice(result.count > 0 ? `Removed ${result.count} message${result.count === 1 ? "" : "s"}.` : "Nothing to remove.");
+      reload();
+    } catch (err) {
+      setNotice(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await client.deleteConversation(conversation.id);
+      props.onDeleted();
+    } catch (err) {
+      setNotice(errorText(err));
+      setBusy(false);
+    }
+  };
 
   return (
     <section className={cx("thread")} aria-label={`Conversation ${conversationTitle(conversation)}`}>
@@ -212,7 +288,45 @@ function Thread(props: {
         >
           {muted ? "Unmute" : "Mute"}
         </button>
+        <button type="button" className={cx("button")} disabled={busy} onClick={() => setConfirmDelete(true)}>
+          Delete…
+        </button>
       </div>
+
+      {(failedCount > 0 || notice || confirmDelete) && (
+        <div className={cx("thread-tools")}>
+          {failedCount > 0 && (
+            <>
+              <span className={cx("muted")}>
+                {failedCount} message{failedCount === 1 ? "" : "s"} never went out.
+              </span>
+              <button type="button" className={cx("button")} disabled={busy} onClick={() => void clearFailed()}>
+                Clear them
+              </button>
+              <span className={cx("tx-label")}>Transmits: no</span>
+            </>
+          )}
+          {notice && <span className={cx("muted")}>{notice}</span>}
+          {confirmDelete && (
+            <>
+              <span className={cx("warn")}>
+                Delete this conversation from Zeus? The messages are removed from Zeus only.
+              </span>
+              <button
+                type="button"
+                className={`${cx("button")} ${cx("button--primary")}`}
+                disabled={busy}
+                onClick={() => void remove()}
+              >
+                Delete
+              </button>
+              <button type="button" className={cx("button")} onClick={() => setConfirmDelete(false)}>
+                Keep
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className={cx("messages")} aria-live="polite">
         {messages.kind === "loading" && <p className={cx("muted")}>Loading messages…</p>}
@@ -242,6 +356,19 @@ function Thread(props: {
                   {new Date(m.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
                   {rx && ` · ${rx}`}
                   {s.text && <span className={s.warn ? cx("warn") : undefined}> · {s.text}</span>}
+                  {m.direction === "outbound" && (m.status === "failed" || m.status === "notconfirmed") && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className={cx("link")}
+                        disabled={!connected || retrying !== null}
+                        onClick={() => void retry(m.id)}
+                      >
+                        {retrying === m.id ? "Sending…" : "Send again"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

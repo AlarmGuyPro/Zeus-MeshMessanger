@@ -113,6 +113,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         {
             var deviceFrame = await CommandAsync(DeviceQuery(), c => c == RespDeviceInfo, session.Token).ConfigureAwait(false);
             var device = ParseDeviceInfo(deviceFrame);
+            Log(LogLevel.Info, $"Connected to {device.Model ?? "a MeshCore node"} running {device.Version ?? "unknown firmware"}.");
             var selfFrame = await CommandAsync(AppStart(AppName), c => c == RespSelfInfo, session.Token).ConfigureAwait(false);
             var self = ParseSelfInfo(selfFrame);
             CheckIdentity(Convert.ToHexString(self.PublicKey).ToLowerInvariant());
@@ -139,6 +140,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
 
             await LoadContactsAsync(session.Token).ConfigureAwait(false);
             await LoadChannelsAsync(Math.Clamp(device.MaxChannels, 1, 64), session.Token).ConfigureAwait(false);
+            Log(LogLevel.Info, $"{_contacts.Count} contact(s) and {_slots.Count(x => !x.IsEmpty)} channel(s) on the node.");
             SetState(ConnectorState.Connected, null);
 
             // Messages the node held while Zeus was away.
@@ -241,7 +243,12 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 var rtt = BitConverter.ToInt32(f, 5);
                 if (_awaitingAck.TryRemove(tag, out _))
                 {
+                    Log(LogLevel.Receive, $"Delivered: ack {tag:x8} after {rtt} ms.");
                     PublishDelivery(new DeliveryUpdate(Tag(tag), DeliveryStatus.Delivered, null, rtt));
+                }
+                else
+                {
+                    Log(LogLevel.Receive, $"Acknowledgement {tag:x8} arrived for a message Zeus wasn't tracking.");
                 }
                 break;
             }
@@ -250,6 +257,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 // The firmware sends NEW_ADVERT only for a node it did NOT save
                 // (manual-add mode, hop limit, or a full table); saved ones come as PUSH_ADVERT.
                 var contact = ParseContact(f);
+                Log(LogLevel.Receive, $"Heard an advert from \"{contact.Name}\" ({Short(Convert.ToHexString(contact.PublicKey))}). The node has not saved it as a contact.");
                 lock (_gate)
                 {
                     _heard = new Dictionary<string, (Contact, byte[])>(_heard, StringComparer.OrdinalIgnoreCase)
@@ -260,6 +268,9 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 RaiseChanged();
                 break;
             }
+            case PushContactsFull:
+                Log(LogLevel.Warning, "The node reports its contact list is full.");
+                break;
             case PushAdvert or PushPathUpdated or PushContactDeleted:
                 // Contact details changed; refresh on the next quiet moment.
                 _ = RefreshContactsSoonAsync();
@@ -416,7 +427,9 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 case ConversationKind.Channel:
                 {
                     if (!int.TryParse(to.Peer, out var index)) return SendResult.Failure("Unknown channel.");
+                    Log(LogLevel.Send, $"Channel {index}: sending {Encoding.UTF8.GetByteCount(text)} bytes.");
                     await CommandAsync(SendChannel(index, ts, text), c => c is RespOk, ct).ConfigureAwait(false);
+                    Log(LogLevel.Send, $"Channel {index}: the node accepted it (channels are not acknowledged).");
                     // Channels have no acknowledgement in MeshCore; "Sent" is final.
                     return SendResult.Success(null, Airtime(text, channel: true), flood: true);
                 }
@@ -443,11 +456,24 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                     {
                         // Heard but not saved: save it on the node first (local, no transmission),
                         // as the MeshCore app does when you tap "Add contact".
-                        await CommandAsync(AddContactFromAdvert(saveFirst), c => c is RespOk, ct).ConfigureAwait(false);
+                        Log(LogLevel.Info, $"Saving heard station {Short(to.Peer)} as a contact on the node.");
+                        try
+                        {
+                            await CommandAsync(AddContactFromAdvert(saveFirst), c => c is RespOk, ct).ConfigureAwait(false);
+                        }
+                        catch (MeshCoreException ex)
+                        {
+                            Log(LogLevel.Error, $"The node refused to save the contact: {ex.Message} (code {ex.Code}).");
+                            return SendResult.Failure(ex.Code == ErrTableFull
+                                ? "Not sent: the node's contact list is full. Remove a contact in the MeshCore app and try again."
+                                : $"Not sent: the node wouldn't save this contact ({ex.Message}).");
+                        }
                         await LoadContactsAsync(ct).ConfigureAwait(false);
                     }
+                    Log(LogLevel.Send, $"Direct to {Short(to.Peer)}: sending {Encoding.UTF8.GetByteCount(text)} bytes.");
                     var f = await CommandAsync(SendDirect(prefix, ts, text), c => c is RespSent, ct).ConfigureAwait(false);
                     var sent = ParseSent(f);
+                    Log(LogLevel.Send, $"Direct to {Short(to.Peer)}: {(sent.Flood ? "flooded" : "sent on a known path")}, ack tag {sent.AckTag:x8}, node suggests waiting {sent.SuggestedTimeoutMs} ms.");
                     var due = Options.Time.GetUtcNow() + TimeSpan.FromMilliseconds(Math.Clamp(sent.SuggestedTimeoutMs, 2000u, 120_000u) * 2 + 5000);
                     _awaitingAck[sent.AckTag] = (to, due);
                     return SendResult.Success(Tag(sent.AckTag), Airtime(text, channel: false), sent.Flood);
@@ -458,14 +484,23 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         }
         catch (MeshCoreException ex)
         {
-            return SendResult.Failure($"Not sent: {ex.Message}.");
+            Log(LogLevel.Error, $"Send failed: {ex.Message} (code {ex.Code}).");
+            return SendResult.Failure(ex.Code switch
+            {
+                // MSG_SEND_FAILED: the node had no free packet buffer. It clears on its own.
+                ErrTableFull => "Not sent: the node had no free packet buffer. It is busy on the air — try again in a few seconds.",
+                ErrNotFound => "Not sent: the node no longer has this contact or channel.",
+                _ => $"Not sent: {ex.Message}.",
+            });
         }
         catch (IOException)
         {
+            Log(LogLevel.Error, "Send failed: the connection to the node dropped.");
             return SendResult.Failure("Not sent: the connection to the node dropped.");
         }
         catch (TimeoutException)
         {
+            Log(LogLevel.Error, "Send failed: the node didn't answer in time.");
             return SendResult.Failure("Not sent: the node didn't answer.");
         }
     }
@@ -480,6 +515,41 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 PublishDelivery(new DeliveryUpdate(Tag(tag), DeliveryStatus.NotConfirmed, "No acknowledgement from the recipient.", null));
             }
         }
+    }
+
+    public override bool CanAnnounce => true;
+
+    /// <summary>
+    /// CMD_SEND_SELF_ADVERT. Flood reaches the whole mesh through repeaters;
+    /// zero-hop only stations that hear this node directly.
+    /// </summary>
+    public override async Task<SendResult> AnnounceAsync(bool flood, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return SendResult.Failure($"{DisplayName} is not connected.");
+        try
+        {
+            Log(LogLevel.Send, flood ? "Sending an advert to the whole mesh." : "Sending an advert to stations in direct range.");
+            await CommandAsync(SelfAdvert(flood), c => c is RespOk, ct).ConfigureAwait(false);
+            return SendResult.Success(null, Airtime(new string('x', 96), channel: false), flood);
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Advert failed: {ex.Message} (code {ex.Code}).");
+            return SendResult.Failure(ex.Code == ErrTableFull
+                ? "The node had no free packet buffer. It is busy on the air — try again in a few seconds."
+                : $"The node refused: {ex.Message}.");
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return SendResult.Failure("The node didn't answer.");
+        }
+    }
+
+    public override async Task RefreshPeersAsync(CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return;
+        await LoadContactsAsync(ct).ConfigureAwait(false);
+        Log(LogLevel.Info, $"Re-read the node's contacts: {_contacts.Count} saved.");
     }
 
     private TimeSpan Airtime(string text, bool channel)
@@ -520,7 +590,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         CommandAsync(command, f =>
         {
             if (isReply(f[0])) return true;
-            if (f[0] == RespErr) throw new MeshCoreException(ErrorText(f));
+            if (f[0] == RespErr) throw new MeshCoreException(ErrorText(f), ErrorCode(f));
             return (bool?)null;
         }, ct, timeout);
 
@@ -583,4 +653,8 @@ public sealed class MeshCoreConnector : MeshConnectorBase
 }
 
 /// <summary>The node answered a command with an error frame.</summary>
-public sealed class MeshCoreException(string message) : Exception(message);
+public sealed class MeshCoreException(string message, byte code = 0) : Exception(message)
+{
+    /// <summary>The firmware's error code, or 0 when the failure wasn't an ERR frame.</summary>
+    public byte Code { get; } = code;
+}

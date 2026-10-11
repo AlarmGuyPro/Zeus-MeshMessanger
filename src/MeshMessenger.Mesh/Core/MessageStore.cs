@@ -189,6 +189,58 @@ public sealed class MessageStore
         return true;
     }
 
+    /// <summary>Forgets a conversation and its messages. Zeus-side only; the node keeps nothing.</summary>
+    public bool Remove(string conversationId)
+    {
+        lock (_gate)
+        {
+            if (!_conversations.Remove(conversationId)) return false;
+            Touch();
+        }
+        Changed?.Invoke();
+        return true;
+    }
+
+    /// <summary>Removes messages that never went out, so a thread can be tidied after a bad patch.</summary>
+    /// <returns>How many were removed, or -1 when the conversation is unknown.</returns>
+    public int ClearFailed(string conversationId)
+    {
+        int removed;
+        lock (_gate)
+        {
+            if (!_conversations.TryGetValue(conversationId, out var entry)) return -1;
+            removed = entry.Messages.RemoveAll(m => m.Direction == MessageDirection.Outbound && m.Status is DeliveryStatus.Failed or DeliveryStatus.NotConfirmed);
+            if (removed == 0) return 0;
+            Touch();
+        }
+        Changed?.Invoke();
+        return removed;
+    }
+
+    /// <summary>Finds one message in a conversation, for resending it.</summary>
+    public StoredMessage? Message(string conversationId, string messageId)
+    {
+        lock (_gate)
+        {
+            return _conversations.TryGetValue(conversationId, out var entry)
+                ? entry.Messages.FirstOrDefault(m => m.Id == messageId)
+                : null;
+        }
+    }
+
+    /// <summary>Removes one message from a conversation.</summary>
+    public bool RemoveMessage(string conversationId, string messageId)
+    {
+        lock (_gate)
+        {
+            if (!_conversations.TryGetValue(conversationId, out var entry)) return false;
+            if (entry.Messages.RemoveAll(m => m.Id == messageId) == 0) return false;
+            Touch();
+        }
+        Changed?.Invoke();
+        return true;
+    }
+
     public IReadOnlyList<Summary> Summaries()
     {
         lock (_gate)

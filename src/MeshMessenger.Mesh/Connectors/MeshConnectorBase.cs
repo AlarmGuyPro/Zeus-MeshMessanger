@@ -55,6 +55,8 @@ public abstract class MeshConnectorBase : IMeshConnector
     private readonly HashSet<string> _ignoredMoves = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset _nextRefind = DateTimeOffset.MinValue;
     private int _refindAttempts;
+    private readonly Queue<LogEntry> _activity = new();
+    private const int MaxActivity = 400;
 
     protected MeshConnectorBase(NodeConfig config, ConnectorOptions? options = null)
     {
@@ -94,6 +96,22 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     public abstract IReadOnlyList<PeerInfo> Peers { get; }
 
+    public IReadOnlyList<LogEntry> Activity
+    {
+        get { lock (_activity) return _activity.ToArray(); }
+    }
+
+    /// <summary>Adds a line to this node's activity log (oldest dropped past the cap).</summary>
+    protected void Log(LogLevel level, string text)
+    {
+        var entry = new LogEntry(Options.Time.GetUtcNow(), level, text);
+        lock (_activity)
+        {
+            _activity.Enqueue(entry);
+            while (_activity.Count > MaxActivity) _activity.Dequeue();
+        }
+    }
+
     public abstract IReadOnlyList<ChannelInfo> Channels { get; }
 
     public abstract int MaxTextBytes(ConversationKind kind);
@@ -122,6 +140,13 @@ public abstract class MeshConnectorBase : IMeshConnector
     }
 
     public abstract Task<SendResult> SendAsync(ConversationKey to, string text, CancellationToken ct);
+
+    public virtual bool CanAnnounce => false;
+
+    public virtual Task<SendResult> AnnounceAsync(bool flood, CancellationToken ct) =>
+        Task.FromResult(SendResult.Failure($"{DisplayName} announces itself on its own; Zeus can't ask it to."));
+
+    public virtual Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Operator accepted the pending move.</summary>
     public bool AcceptMove()
@@ -311,6 +336,11 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     protected void SetState(ConnectorState state, string? detail = null)
     {
+        if (state != State || !string.Equals(detail, StateDetail, StringComparison.Ordinal))
+        {
+            Log(state is ConnectorState.Error ? LogLevel.Error : LogLevel.Info,
+                detail is null ? $"State: {state}." : $"State: {state} — {detail}");
+        }
         State = state;
         StateDetail = detail;
         RaiseChanged();
@@ -328,6 +358,9 @@ public abstract class MeshConnectorBase : IMeshConnector
     }
 
     protected void PublishDelivery(DeliveryUpdate update) => DeliveryChanged?.Invoke(update);
+
+    /// <summary>A short, readable form of a long identity for logs.</summary>
+    protected static string Short(string id) => id.Length > 12 ? $"{id[..10]}…" : id;
 
     /// <summary>Host part of "host" or "host:port" (IPv6 brackets removed).</summary>
     protected static string HostName(string host)

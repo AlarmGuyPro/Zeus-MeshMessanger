@@ -16,6 +16,15 @@ public sealed class StubConnector(string id, MeshNetwork network) : IMeshConnect
     public string Host => "127.0.0.1";
     public IReadOnlyList<PeerInfo> Peers => [];
     public IReadOnlyList<ChannelInfo> Channels => [];
+    public IReadOnlyList<LogEntry> Activity => [];
+    public bool CanAnnounce => true;
+    public List<bool> Adverts { get; } = [];
+    public Task<SendResult> AnnounceAsync(bool flood, CancellationToken ct)
+    {
+        Adverts.Add(flood);
+        return Task.FromResult(SendResult.Success(null, Airtime, flood));
+    }
+    public Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
     public int Limit { get; set; } = 200;
     public TimeSpan Airtime { get; set; } = TimeSpan.Zero;
     public List<(ConversationKey To, string Text, long At)> Sends { get; } = [];

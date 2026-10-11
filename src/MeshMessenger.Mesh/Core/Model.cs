@@ -128,6 +128,23 @@ public enum PeerKind
     Unknown,
 }
 
+/// <summary>How serious a logged event is; drives the colour in the Debug tab.</summary>
+public enum LogLevel
+{
+    Info,
+    Send,
+    Receive,
+    Warning,
+    Error,
+}
+
+/// <summary>
+/// One line in a connector's rolling activity log. Written for anything that
+/// explains what the node and Zeus did: connects, commands, replies, errors.
+/// Message text is never logged; only what the protocol did with it.
+/// </summary>
+public sealed record LogEntry(DateTimeOffset At, LogLevel Level, string Text);
+
 /// <summary>A node our node knows about (Meshtastic node DB, MeshCore contacts).</summary>
 public sealed record PeerInfo(
     string Id,

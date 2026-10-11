@@ -169,6 +169,43 @@ async function json<T>(response: Response): Promise<T> {
 
 const enc = encodeURIComponent;
 
+export type LogLevel = "info" | "send" | "receive" | "warning" | "error";
+
+export interface LogEntryDto {
+  at: string;
+  level: LogLevel;
+  text: string;
+}
+
+export interface NodeDebugDto {
+  id: string;
+  name: string;
+  network: Network;
+  state: NodeState;
+  detail?: string;
+  host: string;
+  port: number;
+  identity?: string;
+  self?: SelfDto;
+  contacts: number;
+  contactsHeardOnly: number;
+  channels: number;
+  canAnnounce: boolean;
+  activity: LogEntryDto[];
+}
+
+export interface DebugDto {
+  at: string;
+  pluginVersion: string;
+  nodes: NodeDebugDto[];
+}
+
+export interface ActionResultDto {
+  ok: boolean;
+  error?: string;
+  count: number;
+}
+
 export function createClient(api: ZeusPluginApi) {
   const call = async <T>(method: string, path: string, body?: unknown) => json<T>(await api.callBackend(method, path, body));
   return {
@@ -198,6 +235,17 @@ export function createClient(api: ZeusPluginApi) {
       call<SendResponse>("POST", `/conversations/${enc(conversationId)}/reply`, { text }),
     start: (connectorId: string, kind: Kind, peer: string, text: string) =>
       call<SendResponse>("POST", "/conversations", { connectorId, kind, peer, text }),
+    deleteConversation: (conversationId: string) =>
+      api.callBackend("DELETE", `/conversations/${enc(conversationId)}`),
+    clearFailed: (conversationId: string) =>
+      call<ActionResultDto>("POST", `/conversations/${enc(conversationId)}/clear-failed`),
+    retry: (conversationId: string, messageId: string) =>
+      call<SendResponse>("POST", `/conversations/${enc(conversationId)}/messages/${enc(messageId)}/retry`),
+    refreshPeers: (nodeId: string) => call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/refresh-peers`),
+    // Transmits. Only ever called from an explicit button press.
+    announce: (nodeId: string, flood: boolean) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/announce`, { flood }),
+    debug: () => call<DebugDto>("GET", "/debug"),
   };
 }
 

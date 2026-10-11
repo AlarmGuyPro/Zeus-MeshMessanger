@@ -212,6 +212,48 @@ ${e("divider")} { display: flex; align-items: center; gap: 8px; color: var(--fg-
 ${e("divider")}::before, ${e("divider")}::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 ${e("ok")} { color: var(--ok); }
 ${e("warn")} { color: var(--amber); }
+${e("tx-text")} { color: var(--tx); }
+${e("thread-tools")} {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  font-size: 12px;
+}
+${e("link")} {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-bright);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+${e("link")}:disabled { color: var(--fg-3); cursor: not-allowed; text-decoration: none; }
+${e("log")} {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 22em;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-inset);
+}
+${e("log-line")} {
+  display: grid;
+  grid-template-columns: auto 1.6em 1fr;
+  gap: 8px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+${e("log-line")}:last-child { border-bottom: 0; }
 ${e("chip")} {
   display: inline-flex;
   align-items: center;

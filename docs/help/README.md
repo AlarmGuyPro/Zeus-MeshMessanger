@@ -10,6 +10,7 @@ inside Zeus, through a LoRa node dedicated to the station.
 - [Reading signal and hops](signal.md) — what SNR, RSSI and hops tell you
 - [Tools](tools.md) — traceroute, path discovery, trace, adverts, repeater status
 - [When Zeus is closed](offline.md) — what your node keeps for you, and what it can't
+- [Finding and fixing problems](debug.md) — the Debug tab, tidying up stale messages
 - [Options reference](options.md) — **every setting: what it does, whether it transmits, its default**
 
 ## Two rules worth knowing first

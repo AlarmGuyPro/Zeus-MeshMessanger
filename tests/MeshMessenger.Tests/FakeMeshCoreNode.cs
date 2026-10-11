@@ -30,6 +30,8 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
     public List<(string Name, byte[] Secret)> ChannelSlots { get; } = [];
     public ConcurrentQueue<byte[]> Received { get; } = new();
     public bool AckDirectMessages { get; set; } = true;
+    /// <summary>Makes sends fail the way the firmware does when its packet pool is empty.</summary>
+    public bool FailSends { get; set; }
     public int Connections;
 
     public FakeMeshCoreNode(string address = "127.0.0.1", int port = 0, byte[]? publicKey = null)
@@ -244,9 +246,18 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 Received.Enqueue(cmd);
                 await WriteAsync(s, cmd[2] < ChannelSlots.Count ? [RespOk] : [RespErr, 2]);
                 break;
+            case CmdSendSelfAdvert:
+                Received.Enqueue(cmd);
+                await WriteAsync(s, [RespOk]);
+                break;
             case CmdSendTxtMsg:
             {
                 Received.Enqueue(cmd);
+                if (FailSends)
+                {
+                    await WriteAsync(s, [RespErr, ErrTableFull]);
+                    break;
+                }
                 var prefix = cmd.AsSpan(7, 6).ToArray();
                 if (!Contacts.Any(c => c.Key.AsSpan().StartsWith(prefix)))
                 {

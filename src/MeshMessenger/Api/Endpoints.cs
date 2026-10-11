@@ -58,6 +58,19 @@ public sealed record SettingsRequest(List<string>? ScanRanges, int? HistoryPerCo
 
 public sealed record ErrorDto(string Error);
 
+public sealed record LogEntryDto(DateTimeOffset At, string Level, string Text);
+
+public sealed record NodeDebugDto(
+    string Id, string Name, string Network, string State, string? Detail, string Host, int Port,
+    string? Identity, SelfDto? Self, int Contacts, int ContactsHeardOnly, int Channels, bool CanAnnounce,
+    IReadOnlyList<LogEntryDto> Activity);
+
+public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnlyList<NodeDebugDto> Nodes);
+
+public sealed record AnnounceRequest(bool? Flood);
+
+public sealed record ActionResultDto(bool Ok, string? Error, int Count);
+
 /// <summary>
 /// HTTP surface under <c>/api/plugins/io.github.alarmguypro.meshmessenger/</c>.
 /// Note there is no endpoint that sends "on network X": replies are addressed
@@ -169,6 +182,56 @@ internal static class Endpoints
             return ToResult(await r.ReplyAsync(id, body.Text ?? "", ct));
         });
 
+        // ---------------------------------------------------------------- housekeeping
+
+        e.MapDelete("conversations/{id}", (string id) =>
+        {
+            if (nodes() is not { } m) return Unavailable();
+            return m.Store.Remove(id) ? Results.Ok() : Results.NotFound();
+        });
+
+        e.MapPost("conversations/{id}/clear-failed", (string id) =>
+        {
+            if (nodes() is not { } m) return Unavailable();
+            var removed = m.Store.ClearFailed(id);
+            return removed < 0 ? Results.NotFound() : Results.Ok(new ActionResultDto(true, null, removed));
+        });
+
+        e.MapPost("conversations/{id}/messages/{messageId}/retry", async (string id, string messageId, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r } m) return Unavailable();
+            var message = m.Store.Message(id, messageId);
+            if (message is null) return Results.NotFound();
+            if (message.Direction != MessageDirection.Outbound)
+            {
+                return Results.BadRequest(new SendResponse(false, "Only messages you sent can be retried.", id, null));
+            }
+            var result = await r.ReplyAsync(id, message.Text, ct);
+            if (result.Ok) m.Store.RemoveMessage(id, messageId); // the retry replaces the failed entry
+            return ToResult(result);
+        });
+
+        // ---------------------------------------------------------------- contacts & debug
+
+        e.MapPost("nodes/{id}/refresh-peers", async (string id, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            await c.RefreshPeersAsync(ct);
+            return Results.Ok(new ActionResultDto(true, null, c.Peers.Count));
+        });
+
+        // Transmits: only ever from an explicit button press.
+        e.MapPost("nodes/{id}/announce", async (string id, AnnounceRequest? body, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is null) return Results.NotFound();
+            var error = await r.AnnounceAsync(id, body?.Flood ?? true, ct);
+            return Results.Ok(new ActionResultDto(error is null, error, 0));
+        });
+
+        e.MapGet("debug", () => nodes() is { } m ? Results.Ok(Debug(m)) : Unavailable());
+
         e.MapPost("conversations", async (StartConversationRequest body, CancellationToken ct) =>
         {
             if (nodes() is not { Router: { } r }) return Unavailable();
@@ -183,6 +246,28 @@ internal static class Endpoints
             return ToResult(await r.StartAsync(body.ConnectorId, kind, body.Peer ?? "", body.Text ?? "", ct));
         });
     }
+
+    private static DebugDto Debug(NodeManager m)
+    {
+        var connectors = (m.Router?.Connectors ?? []).ToDictionary(c => c.Id, StringComparer.Ordinal);
+        var list = new List<NodeDebugDto>();
+        foreach (var n in m.Config.Nodes)
+        {
+            connectors.TryGetValue(n.Id, out var c);
+            var peers = c?.Peers ?? [];
+            list.Add(new NodeDebugDto(
+                n.Id, c?.DisplayName ?? DisplayName(n), Lower(n.Network),
+                c is null ? (n.Enabled ? "disconnected" : "disabled") : Lower(c.State),
+                c?.StateDetail, c?.Host ?? n.Host, PortOf(n), n.Identity,
+                c?.Self is { } s ? new SelfDto(s.Identity, s.Name, s.ShortName, s.Firmware, s.Model, s.RadioSummary) : null,
+                peers.Count(p => p.SavedOnNode), peers.Count(p => !p.SavedOnNode),
+                c?.Channels.Count ?? 0, c?.CanAnnounce ?? false,
+                (c?.Activity ?? []).Select(a => new LogEntryDto(a.At, Lower(a.Level), a.Text)).ToArray()));
+        }
+        return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
+    }
+
+    private const string PluginVersion = "0.2.0";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);

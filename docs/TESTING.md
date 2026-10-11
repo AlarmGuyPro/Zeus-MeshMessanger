@@ -55,6 +55,10 @@ workspace.
 | 8 | Put a different node at the old IP | Zeus refuses it and says so |
 | 9 | Nodes tab | Contacts / node list with last heard, SNR, hops |
 | 10 | Room server (MeshCore) | Posts arrive in a Room conversation with author names |
+| 11 | Nodes → **Send advert**, then check another station | It lists this node within a minute |
+| 12 | Message a station shown as **heard · not saved** | Zeus saves it on the node, then sends |
+| 13 | **Debug** tab | A log of connects, sends and acknowledgements; **Copy all** works |
+| 14 | A failed message → **Send again**, then **Clear them** | Retries, then tidies the thread |
 
 If something fails, the node's status line (hover it in the node bar) has the
 reason. Note the firmware version from the Nodes tab when reporting.

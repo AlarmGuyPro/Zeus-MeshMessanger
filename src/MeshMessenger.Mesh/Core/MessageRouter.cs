@@ -51,6 +51,20 @@ public sealed class MessageRouter : IDisposable
         public static RouteResult Fail(string error, string? conversationId = null) => new(false, error, conversationId, null);
     }
 
+    /// <summary>
+    /// Asks a node to announce itself, through the transmit coordinator like any
+    /// other transmission. Returns null on success, or the reason it failed.
+    /// </summary>
+    public async Task<string?> AnnounceAsync(string connectorId, bool flood, CancellationToken ct)
+    {
+        if (!_connectors.TryGetValue(connectorId, out var connector))
+        {
+            return $"No node is configured with id '{connectorId}'.";
+        }
+        var result = await _tx.RunAsync(token => connector.AnnounceAsync(flood, token), ct).ConfigureAwait(false);
+        return result.Ok ? null : result.Error ?? "The advert was not sent.";
+    }
+
     /// <summary>Reply in an existing conversation, on the connector it belongs to.</summary>
     public async Task<RouteResult> ReplyAsync(string conversationId, string text, CancellationToken ct)
     {

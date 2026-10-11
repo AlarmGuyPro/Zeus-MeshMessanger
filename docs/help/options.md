@@ -25,6 +25,9 @@ so it costs the whole mesh airtime, not just yours.
 | Re-pair | Zeus remembers each node's identity and refuses a different node at the same address. Use Re-pair after re-flashing or replacing the board. | No | — |
 | Port | TCP port. Meshtastic 4403, MeshCore 5000 unless your firmware was built differently. | No | 4403 / 5000 |
 | Enabled | Off disconnects Zeus from the node without deleting its conversations. | No | On |
+| Re-read from node | Asks the node for its contact or node list again. Useful after adding a contact in the phone app. | No | — |
+| Send advert (MeshCore) | Announces this node on the air so other stations can add it and message you. | When you press it | — |
+| Search this list | Filters the Nodes list by name, short name, type or key. Local to Zeus. | No | — |
 | Remove node | Disconnects and forgets the node. Its conversations stay in history but can no longer be replied to (replies never move to another node). | No | — |
 
 On every connect Zeus also sets a MeshCore node's clock from the PC clock
@@ -37,6 +40,10 @@ the node itself, not a transmission.
 |---|---|---|---|
 | Send / Reply | Sends your message on the conversation's own node. | When you press it | — |
 | Mute conversation | Stops unread counts and highlights for that conversation. Messages still arrive. | No | Off |
+| Search conversations | Filters the list by title, sender or message text. Local to Zeus. | No | — |
+| Send again | Sends a message that never went out, as a new transmission. The failed entry is replaced. | When you press it | — |
+| Clear them | Removes the messages in this conversation that never went out. Removed from Zeus only. | No | — |
+| Delete… | Forgets the conversation and its messages. Removed from Zeus only; the other station keeps its copy. | No | — |
 | History to keep | How many messages Zeus keeps per conversation, across restarts. Older ones are removed from Zeus only, not from anyone else. | No | 500 |
 
 ## Channels
@@ -74,6 +81,14 @@ been off to collect missed posts.
 | Reset path (MeshCore) | Forgets the stored route to a contact; your next message floods and the route is relearned. | No (the next message does) | — |
 | Send advert (MeshCore) | Announces your node so others can add it. *Zero-hop* reaches only nodes in direct range; *flood* goes across the mesh (more airtime). | When you press it | — |
 | Tool cooldown | Minimum time between route tools, to protect shared airtime. | — | 30 s |
+
+## Debug
+
+| Option | What it does | Transmits | Default |
+|---|---|---|---|
+| Activity log | Shows what each node and Zeus have done recently: connects, commands, replies, acknowledgements and errors. Message text is never logged. Kept in memory only, so it starts empty each time Zeus opens. | No | — |
+| Search the log | Filters the log lines. Local to Zeus. | No | — |
+| Copy all | Copies every node's details and log to the clipboard, for a bug report. | No | — |
 
 ## Health
 

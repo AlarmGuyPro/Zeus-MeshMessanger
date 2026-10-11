@@ -160,6 +160,7 @@ public sealed class MeshtasticConnector : MeshConnectorBase
             {
                 if (pending.Due <= now && _awaitingAck.TryRemove(id, out _))
                 {
+                    Log(LogLevel.Warning, $"No acknowledgement for message {id:x8} within the timeout.");
                     PublishDelivery(new DeliveryUpdate(Tag(id), DeliveryStatus.NotConfirmed, "No acknowledgement arrived.", null));
                 }
             }
@@ -210,6 +211,7 @@ public sealed class MeshtasticConnector : MeshConnectorBase
                     break;
                 case ConfigComplete cc when cc.Id == configId:
                     UpdateSelf();
+                    Log(LogLevel.Info, $"Configuration received: {_nodes.Count} node(s) and {Channels.Count} channel(s) known.");
                     configDone.TrySetResult();
                     break;
                 case PacketMsg pm:
@@ -314,6 +316,7 @@ public sealed class MeshtasticConnector : MeshConnectorBase
         if (error != 0)
         {
             _awaitingAck.TryRemove(p.RequestId, out _);
+            Log(LogLevel.Error, $"Message {p.RequestId:x8} failed: {RoutingErrorText(error)} (routing error {error}).");
             PublishDelivery(new DeliveryUpdate(Tag(p.RequestId), DeliveryStatus.Failed, $"Not delivered: {RoutingErrorText(error)}.", null));
             return;
         }
@@ -321,11 +324,13 @@ public sealed class MeshtasticConnector : MeshConnectorBase
         {
             // Another node rebroadcast our channel message: the best a channel can tell us.
             _awaitingAck.TryRemove(p.RequestId, out _);
+            Log(LogLevel.Receive, $"Message {p.RequestId:x8} was relayed by {NodeId(p.From)}.");
             PublishDelivery(new DeliveryUpdate(Tag(p.RequestId), DeliveryStatus.Delivered, null, null));
         }
         else if (p.From == pending.To)
         {
             _awaitingAck.TryRemove(p.RequestId, out _);
+            Log(LogLevel.Receive, $"Message {p.RequestId:x8} acknowledged by {NodeId(p.From)}.");
             PublishDelivery(new DeliveryUpdate(Tag(p.RequestId), DeliveryStatus.Delivered, null, null));
         }
         // An implicit ack from our own node on a DM only means a neighbour relayed it: keep waiting.
@@ -361,10 +366,14 @@ public sealed class MeshtasticConnector : MeshConnectorBase
         var id = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
         try
         {
+            Log(LogLevel.Send, dest == Broadcast
+                ? $"Channel {channel}: sending {Encoding.UTF8.GetByteCount(text)} bytes (id {id:x8})."
+                : $"Direct to {NodeId(dest)}: sending {Encoding.UTF8.GetByteCount(text)} bytes (id {id:x8}).");
             await WriteAsync(TextPacket(id, dest, channel, text), ct).ConfigureAwait(false);
         }
         catch (IOException)
         {
+            Log(LogLevel.Error, "Send failed: the connection to the node dropped.");
             return SendResult.Failure("Not sent: the connection to the node dropped.");
         }
         _awaitingAck[id] = new PendingAck(to, dest, Options.Time.GetUtcNow() + AckTimeout);

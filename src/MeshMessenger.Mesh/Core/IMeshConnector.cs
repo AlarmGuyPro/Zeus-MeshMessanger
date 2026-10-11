@@ -28,6 +28,21 @@ public interface IMeshConnector : IAsyncDisposable
 
     IReadOnlyList<PeerInfo> Peers { get; }
 
+    /// <summary>Recent protocol activity, newest last. For the Debug tab and bug reports.</summary>
+    IReadOnlyList<LogEntry> Activity { get; }
+
+    /// <summary>True when the node can be asked to announce itself on the air.</summary>
+    bool CanAnnounce { get; }
+
+    /// <summary>
+    /// Asks the node to transmit an announcement of itself, so other stations
+    /// learn its name and key. TRANSMITS; only ever called from an explicit action.
+    /// </summary>
+    Task<SendResult> AnnounceAsync(bool flood, CancellationToken ct);
+
+    /// <summary>Re-reads the node's contact or peer list. Local to the node; transmits nothing.</summary>
+    Task RefreshPeersAsync(CancellationToken ct);
+
     IReadOnlyList<ChannelInfo> Channels { get; }
 
     /// <summary>

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+using MeshMessenger.Connectors.MeshCore;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
@@ -46,6 +47,8 @@ public sealed class PluginHost : IAsyncDisposable
         var text = await r.Content.ReadAsStringAsync();
         return (r.StatusCode, string.IsNullOrEmpty(text) ? null : JsonNode.Parse(text));
     }
+
+    public async Task<HttpStatusCode> DeleteAsync(string path) => (await Http.DeleteAsync(path)).StatusCode;
 
     public async ValueTask DisposeAsync()
     {
@@ -100,6 +103,55 @@ public static class ApiTests
             Assert.Equal(2, messages.AsArray().Count, "both messages restored");
             await Assert.Eventually(() => again.GetAsync("status").Result["nodes"]![0]!["state"]!.GetValue<string>() == "connected", "node config restored");
         }
+    }
+
+    [Test]
+    public static async Task DebugLogAdvertAndHousekeepingOverTheApi()
+    {
+        await using var node = new FakeMeshCoreNode();
+        var friend = node.AddContact("KE0XYZ Mobile");
+        await using var host = await PluginHost.StartAsync(new FakePluginContext());
+        var (added, _) = await host.PostAsync("nodes", new { network = "meshcore", host = $"127.0.0.1:{node.Port}", name = "" });
+        Assert.Equal(HttpStatusCode.OK, added, "node added");
+        await Assert.Eventually(() => host.GetAsync("status").Result["nodes"]![0]!["state"]!.GetValue<string>() == "connected", "connected");
+        var nodeId = (await host.GetAsync("status"))["nodes"]![0]!["id"]!.GetValue<string>();
+
+        // Debug: the node's details and a log of what happened.
+        var debug = await host.GetAsync("debug");
+        var first = debug["nodes"]![0]!;
+        Assert.Equal("v1.12.0", first["self"]!["firmware"]!.GetValue<string>(), "firmware in debug");
+        Assert.Equal(1, first["contacts"]!.GetValue<int>(), "contact counted");
+        Assert.True(first["activity"]!.AsArray().Count > 0, "activity logged");
+        Assert.True(first["activity"]!.AsArray().Any(a => a!["text"]!.GetValue<string>().Contains("Connected to")), "connect logged");
+
+        // Advert: transmits, so only from an explicit call.
+        var (advertStatus, advert) = await host.PostAsync($"nodes/{nodeId}/announce", new { flood = true });
+        Assert.Equal(HttpStatusCode.OK, advertStatus, "advert accepted");
+        Assert.True(advert!["ok"]!.GetValue<bool>(), $"advert sent: {advert}");
+        Assert.True(node.Received.Any(r => r[0] == MeshCoreProtocol.CmdSendSelfAdvert), "node asked to advertise");
+
+        // Re-read contacts without transmitting.
+        node.AddContact("W0QQ Base");
+        var (refreshStatus, refresh) = await host.PostAsync($"nodes/{nodeId}/refresh-peers", new { });
+        Assert.Equal(HttpStatusCode.OK, refreshStatus, "refresh accepted");
+        Assert.Equal(2, refresh!["count"]!.GetValue<int>(), "second contact picked up");
+
+        // A failed send can be cleared, and the conversation deleted.
+        await node.HearDirectAsync(friend, "are you on?");
+        await Assert.Eventually(() => host.GetAsync("conversations").Result.AsArray().Count == 1, "conversation listed");
+        var id = (await host.GetAsync("conversations"))[0]!["id"]!.GetValue<string>();
+        var escaped = Uri.EscapeDataString(id);
+        node.FailSends = true;
+        var (_, failed) = await host.PostAsync($"conversations/{escaped}/reply", new { text = "this one fails" });
+        Assert.False(failed!["ok"]!.GetValue<bool>(), "send refused by the node");
+        Assert.Contains("packet buffer", failed["error"]!.GetValue<string>(), "explains the node's reason");
+
+        var (_, cleared) = await host.PostAsync($"conversations/{escaped}/clear-failed", new { });
+        Assert.Equal(1, cleared!["count"]!.GetValue<int>(), "failed message cleared");
+        Assert.Equal(1, (await host.GetAsync($"conversations/{escaped}/messages")).AsArray().Count, "only the inbound one left");
+
+        Assert.Equal(HttpStatusCode.OK, await host.DeleteAsync($"conversations/{escaped}"), "conversation deleted");
+        Assert.Equal(0, (await host.GetAsync("conversations")).AsArray().Count, "gone from the list");
     }
 
     [Test]

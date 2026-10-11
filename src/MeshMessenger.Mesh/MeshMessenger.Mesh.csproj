@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>MeshMessenger.Mesh</AssemblyName>
     <RootNamespace>MeshMessenger</RootNamespace>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>

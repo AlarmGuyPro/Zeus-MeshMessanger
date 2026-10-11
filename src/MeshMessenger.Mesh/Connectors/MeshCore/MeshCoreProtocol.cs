@@ -98,6 +98,9 @@ public static class MeshCoreProtocol
 
     public static byte[] GetBattery() => [CmdGetBattAndStorage];
 
+    /// <summary>Ask the node to announce itself. 1 = flood the mesh, 0 = direct range only.</summary>
+    public static byte[] SelfAdvert(bool flood) => [CmdSendSelfAdvert, (byte)(flood ? 1 : 0)];
+
     public static byte[] SendDirect(ReadOnlySpan<byte> recipientKeyPrefix6, uint timestamp, string text, byte attempt = 0)
     {
         var t = Encoding.UTF8.GetBytes(text);
@@ -283,14 +286,21 @@ public static class MeshCoreProtocol
         return (text[..at], text[(at + 2)..]);
     }
 
-    public static string ErrorText(ReadOnlySpan<byte> f) => (f.Length > 1 ? f[1] : 0) switch
+    // Firmware error codes (examples/companion_radio/MyMesh.cpp):
+    // 1 UNSUPPORTED_CMD, 2 NOT_FOUND, 3 TABLE_FULL, 4 BAD_STATE, 5 FILE_IO_ERROR, 6 ILLEGAL_ARG.
+    public const byte ErrUnsupported = 1, ErrNotFound = 2, ErrTableFull = 3, ErrBadState = 4, ErrFileIo = 5, ErrIllegalArg = 6;
+
+    public static byte ErrorCode(ReadOnlySpan<byte> f) => f.Length > 1 ? f[1] : (byte)0;
+
+    public static string ErrorText(ReadOnlySpan<byte> f) => ErrorCode(f) switch
     {
-        1 => "the node doesn't support that command",
-        2 => "not found on the node",
-        3 => "the node's send queue is full; try again shortly",
-        4 => "the node is busy",
-        5 => "storage error on the node",
-        6 => "the node rejected the request",
+        ErrUnsupported => "the node doesn't support that command",
+        ErrNotFound => "the node couldn't find that contact or channel",
+        // TABLE_FULL from a send means the node had no free packet buffer, not that a list is full.
+        ErrTableFull => "the node had no free packet buffer (it is busy on the air)",
+        ErrBadState => "the node is busy with another request",
+        ErrFileIo => "storage error on the node",
+        ErrIllegalArg => "the node rejected a value in the request",
         _ => "the node reported an error",
     };
 
