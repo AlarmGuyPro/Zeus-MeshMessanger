@@ -5,9 +5,14 @@
 ; then put your 2.4 GHz Wi-Fi name and password in the two marked lines of the
 ; section for your board. Keep the quotes exactly as shown: '"...."'
 ;
-; In VS Code: PlatformIO sidebar > Project Tasks > zeus_meshcore_v4 > Upload
+; Build and upload from the VS Code terminal (board in download mode first):
+;   & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e zeus_meshcore_v4 -t upload
+; then press RST.
 ; (Plain Upload keeps the node's identity, name, radio and channels.
 ;  Don't use Erase Flash.)
+;
+; Lines that start a setting (extends, board_upload..., build_flags) must start
+; at the left edge; only continuation lines are indented.
 ;
 ; Based on [env:heltec_v4_companion_radio_wifi] in MeshCore companion-v1.17.1,
 ; copied in full rather than overridden so the result is predictable.
@@ -16,6 +21,12 @@
 ; ---- Heltec V4 (standard, 2 MB PSRAM) ----
 [env:zeus_meshcore_v4]
 extends = heltec_v4_oled
+; Upload: the V4's USB port doesn't do the automatic reset into download mode
+; reliably, so PlatformIO leaves the board alone and you enter download mode
+; with the buttons (hold PRG, tap RST, release PRG) before uploading.
+board_upload.use_1200bps_touch = no
+board_upload.wait_for_upload_port = no
+board_upload.before_reset = no_reset
 build_flags =
   ${heltec_v4_oled.build_flags}
   -I examples/companion_radio/ui-new
@@ -39,6 +50,12 @@ lib_deps =
 ; ---- Heltec V4 R8 (8 MB PSRAM) ----
 [env:zeus_meshcore_v4_r8]
 extends = heltec_v4_r8_oled
+; Upload: the V4's USB port doesn't do the automatic reset into download mode
+; reliably, so PlatformIO leaves the board alone and you enter download mode
+; with the buttons (hold PRG, tap RST, release PRG) before uploading.
+board_upload.use_1200bps_touch = no
+board_upload.wait_for_upload_port = no
+board_upload.before_reset = no_reset
 build_flags =
   ${heltec_v4_r8_oled.build_flags}
   -I examples/companion_radio/ui-new

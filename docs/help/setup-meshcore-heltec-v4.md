@@ -111,59 +111,76 @@ environment.
 1. Install **Git for Windows**: <https://git-scm.com/download/win>
    (defaults are fine).
 2. Install **Visual Studio Code**: <https://code.visualstudio.com>.
-3. In VS Code: **Extensions** (Ctrl+Shift+X) → search **PlatformIO IDE** →
-   **Install**. Let it finish setting up (watch the bottom-right corner), then
-   restart VS Code when asked.
-4. Open a terminal (in VS Code: **Terminal → New Terminal**) and get the
-   MeshCore source at the current release:
+3. Get the MeshCore source at the current release. In PowerShell (or VS
+   Code's **Terminal → New Terminal**):
 
    ```powershell
    cd $HOME\Documents
    git clone https://github.com/meshcore-dev/MeshCore.git
    cd MeshCore
-   git tag --list "companion-v*" --sort=-creatordate | Select-Object -First 3
    git checkout companion-v1.17.1
    ```
 
-   Use the newest `companion-v…` tag from the list (1.17.1 was current when
-   this was written). Use the same version as the Bluetooth firmware you
-   flashed in step 1, or newer.
-
-5. **File → Open Folder…** → `Documents\MeshCore`. PlatformIO notices the
-   project and spends a few minutes downloading the ESP32 toolchain the first
-   time. Wait until the bottom bar settles.
+   Use the same `companion-v…` version as the Bluetooth firmware you flashed
+   in step 1 (1.17.1 when this was written). The "detached HEAD" message is
+   normal.
+4. In VS Code: **File → Open Folder…** → `Documents\MeshCore`.
+5. **Trust the folder.** If VS Code opens it in *Restricted Mode* (a bar under
+   the menu, and a "Restricted Mode" badge bottom-left), click that badge, or
+   press Ctrl+Shift+P → **Workspaces: Manage Workspace Trust**, and choose
+   **Trust**. Extensions don't run in Restricted Mode.
+6. **Extensions** (Ctrl+Shift+X) → search **PlatformIO IDE** (publisher
+   PlatformIO) → **Install**. It installs its own tools (watch the
+   bottom-right corner) and asks to reload. When it's ready there's an
+   alien-head icon in the left bar.
 
 ## Step 3: Build and load the Wi-Fi firmware
 
-1. In the `MeshCore` folder, create a file named **`platformio.local.ini`**
-   (MeshCore reads this file automatically, and Git ignores it, so your
-   password never ends up anywhere else). Copy in the contents of
+1. In VS Code's Explorer, right-click under the file list → **New File…** →
+   **`platformio.local.ini`** (top level, next to `platformio.ini`). MeshCore
+   loads this file automatically and Git ignores it, so your Wi-Fi password
+   stays on this PC. Paste in the section for your board from
    [`platformio.local.ini.example`](../firmware/meshcore/platformio.local.ini.example)
-   from this repo, then change the two lines:
+   and change the two lines:
 
    ```ini
      -D WIFI_SSID='"YourWiFiName"'
      -D WIFI_PWD='"YourWiFiPassword"'
    ```
 
-   Keep both sets of quotes exactly as shown: `'"` before, `"'` after.
-   - The network must be **2.4 GHz**. The board has no 5 GHz radio. If your
-     router uses one name for both bands, that's fine.
-   - If your password contains `'`, `"` or `\`, those need escaping. Easiest
-     is a separate IoT network or guest network with a simpler password.
-   - If you have an **R8** board, use the R8 section of the example instead.
-2. In the PlatformIO sidebar (the alien-head icon), open **Project Tasks** →
-   **`zeus_meshcore_v4`** (or `zeus_meshcore_v4_r8`) → **Upload**.
-   - The first build takes a few minutes. Later ones are quick.
-   - **Use Upload, not "Erase Flash" or "Upload Filesystem Image".** A plain
-     upload replaces the firmware and leaves the node's saved settings alone.
-   - If the upload can't find the board, use the PRG/RST trick from step 1.
-3. When it finishes, the board restarts. Within a few seconds the home screen
-   shows **`IP: 192.168.x.x`**. That means it's on your Wi-Fi.
+   - Keep both sets of quotes exactly as shown: `'"` before, `"'` after.
+   - Lines like `extends =`, `board_upload…` and `build_flags =` must start at
+     the **left edge**; only the lines under them are indented. An indented
+     setting is silently treated as part of the line above.
+   - The network must be **2.4 GHz** (the board has no 5 GHz radio).
+   - If the password contains `'`, `"` or `\`, those need escaping; a
+     separate IoT or guest network with a simpler password is easiest.
+
+   Save (Ctrl+S).
+2. **Put the board in download mode:** hold **PRG**, tap **RST**, release
+   **PRG**. The screen goes dark. (The V4 doesn't switch into download mode
+   reliably on its own when PlatformIO asks, so the example file tells
+   PlatformIO not to try, and you do it with the buttons.)
+3. In VS Code's terminal (it opens in the MeshCore folder), run:
+
+   ```powershell
+   & "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e zeus_meshcore_v4 -t upload
+   ```
+
+   (Plain `pio` isn't on the Windows PATH, hence the full path. Use
+   `zeus_meshcore_v4_r8` for an R8 board.)
+   - The **first** run downloads the ESP32 toolchain and compiles everything:
+     5–10 minutes. Later runs take under a minute.
+   - Certificate warnings about a download mirror are harmless; PlatformIO
+     tries another mirror.
+   - It writes only the firmware, not the area holding the node's settings,
+     so the name, radio preset, channels and identity from step 1 are kept.
+   - "Wrong boot mode detected" means the board wasn't in download mode:
+     repeat the PRG/RST sequence and run it again.
+4. When it says **SUCCESS**, press **RST**. Within a few seconds the home
+   screen shows **`IP: 192.168.x.x`**. That means it's on your Wi-Fi.
    - `IP: 0.0.0.0` means it hasn't joined. Check the name and password, and
-     that it's a 2.4 GHz network, then rebuild and upload again.
-   - To watch it connect: **Project Tasks → Monitor** shows lines starting
-     `WiFi:`.
+     that it's a 2.4 GHz network, then upload again.
 
 ## Step 4: Add it in Zeus
 
