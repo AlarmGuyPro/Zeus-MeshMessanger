@@ -43,6 +43,18 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Re-reads the node's contact or peer list. Local to the node; transmits nothing.</summary>
     Task RefreshPeersAsync(CancellationToken ct);
 
+    /// <summary>How many contacts the node can hold, when the firmware reports it. A full list can't learn new stations.</summary>
+    int? PeerCapacity { get; }
+
+    /// <summary>Whether the node recycles its oldest contact when the list is full; null when the node has no such setting.</summary>
+    bool? RecycleOldestWhenFull { get; }
+
+    /// <summary>Removes a contact from the node's list. Local to the node. Returns null on success, or the reason.</summary>
+    Task<string?> RemovePeerAsync(string peerId, CancellationToken ct);
+
+    /// <summary>Turns the node's "recycle the oldest contact when full" setting on or off.</summary>
+    Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct);
+
     IReadOnlyList<ChannelInfo> Channels { get; }
 
     /// <summary>

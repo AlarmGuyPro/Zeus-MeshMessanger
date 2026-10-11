@@ -25,6 +25,10 @@ public sealed class StubConnector(string id, MeshNetwork network) : IMeshConnect
         return Task.FromResult(SendResult.Success(null, Airtime, flood));
     }
     public Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
+    public int? PeerCapacity => null;
+    public bool? RecycleOldestWhenFull => null;
+    public Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) => Task.FromResult<string?>(null);
+    public Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct) => Task.FromResult<string?>(null);
     public int Limit { get; set; } = 200;
     public TimeSpan Airtime { get; set; } = TimeSpan.Zero;
     public List<(ConversationKey To, string Text, long At)> Sends { get; } = [];

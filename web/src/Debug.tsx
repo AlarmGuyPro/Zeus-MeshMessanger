@@ -33,7 +33,7 @@ function asText(nodes: NodeDebugDto[], version: string): string {
       "",
       `Node ${n.name} (${n.network}) ${n.host}:${n.port} — ${n.state}${n.detail ? `: ${n.detail}` : ""}`,
       `  firmware ${n.self?.firmware ?? "?"} · model ${n.self?.model ?? "?"} · radio ${n.self?.radio ?? "?"}`,
-      `  contacts ${n.contacts} saved, ${n.contactsHeardOnly} heard only · channels ${n.channels}`,
+      `  contacts ${n.contacts}${n.contactCapacity ? `/${n.contactCapacity}` : ""} saved, ${n.contactsHeardOnly} heard only · recycle-oldest ${n.recycleOldestWhenFull ?? "n/a"} · channels ${n.channels}`,
     );
     for (const a of n.activity) lines.push(`  ${a.at} [${a.level}] ${a.text}`);
   }
@@ -115,7 +115,16 @@ export function Debug({ client }: { client: Client }) {
             {node.self?.radio ? ` · ${node.self.radio}` : ""}
           </p>
           <p className={cx("help")}>
-            {node.contacts} contact{node.contacts === 1 ? "" : "s"} saved on the node
+            {node.contacts}
+            {node.contactCapacity !== undefined && node.contactCapacity !== null
+              ? ` of ${node.contactCapacity}`
+              : ""}{" "}
+            contact{node.contacts === 1 ? "" : "s"} saved on the node
+            {node.contactCapacity !== undefined &&
+            node.contactCapacity !== null &&
+            node.contacts >= node.contactCapacity ? (
+              <span className={cx("warn")}> — full, so it can’t save new stations</span>
+            ) : null}
             {node.contactsHeardOnly > 0 ? `, ${node.contactsHeardOnly} heard but not saved` : ""} · {node.channels}{" "}
             channel{node.channels === 1 ? "" : "s"}
             {node.identity ? ` · paired with ${node.identity.slice(0, 12)}…` : ""}

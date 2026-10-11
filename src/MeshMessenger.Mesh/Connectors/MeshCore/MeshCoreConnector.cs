@@ -32,6 +32,9 @@ public sealed class MeshCoreConnector : MeshConnectorBase
     // Heard (PUSH_NEW_ADVERT) but not saved on the node, e.g. when the node is set to add
     // contacts manually. The node can't exchange direct messages with these until saved.
     private Dictionary<string, (Contact Contact, byte[] Frame)> _heard = new(StringComparer.OrdinalIgnoreCase);
+    private int _maxContacts;
+    private byte? _autoAddConfig;
+    private byte _autoAddMaxHops;
     private List<ChannelSlot> _slots = [];
     private SelfInfoFrame? _self;
     private int _syncRequested;
@@ -114,6 +117,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             var deviceFrame = await CommandAsync(DeviceQuery(), c => c == RespDeviceInfo, session.Token).ConfigureAwait(false);
             var device = ParseDeviceInfo(deviceFrame);
             Log(LogLevel.Info, $"Connected to {device.Model ?? "a MeshCore node"} running {device.Version ?? "unknown firmware"}.");
+            lock (_gate) _maxContacts = device.MaxContacts;
             var selfFrame = await CommandAsync(AppStart(AppName), c => c == RespSelfInfo, session.Token).ConfigureAwait(false);
             var self = ParseSelfInfo(selfFrame);
             CheckIdentity(Convert.ToHexString(self.PublicKey).ToLowerInvariant());
@@ -138,6 +142,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 // Node clock already ahead of ours: fine.
             }
 
+            await LoadAutoAddConfigAsync(session.Token).ConfigureAwait(false);
             await LoadContactsAsync(session.Token).ConfigureAwait(false);
             await LoadChannelsAsync(Math.Clamp(device.MaxChannels, 1, 64), session.Token).ConfigureAwait(false);
             Log(LogLevel.Info, $"{_contacts.Count} contact(s) and {_slots.Count(x => !x.IsEmpty)} channel(s) on the node.");
@@ -302,6 +307,24 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         }
     }
 
+    /// <summary>Reads the node's auto-add settings. Older firmware doesn't have the command; that's fine.</summary>
+    private async Task LoadAutoAddConfigAsync(CancellationToken ct)
+    {
+        try
+        {
+            var f = await CommandAsync(GetAutoAddConfig(), c => c is RespAutoAddConfig, ct).ConfigureAwait(false);
+            lock (_gate)
+            {
+                _autoAddConfig = f.Length > 1 ? f[1] : (byte)0;
+                _autoAddMaxHops = f.Length > 2 ? f[2] : (byte)0;
+            }
+        }
+        catch (Exception ex) when (ex is MeshCoreException or TimeoutException)
+        {
+            lock (_gate) _autoAddConfig = null;
+        }
+    }
+
     private async Task LoadContactsAsync(CancellationToken ct)
     {
         var list = new List<Contact>();
@@ -322,8 +345,17 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         }, ct, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
         lock (_gate)
         {
-            _contacts = list.GroupBy(c => Convert.ToHexString(c.PublicKey), StringComparer.OrdinalIgnoreCase)
+            // The firmware's iterator also hands back its reserved scratch slots
+            // (all-zero key, type NONE). They aren't contacts, so drop them.
+            _contacts = list.Where(c => c.Kind != PeerKind.Unknown && c.PublicKey.Any(b => b != 0))
+                .GroupBy(c => Convert.ToHexString(c.PublicKey), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
+            if (_maxContacts > 0 && _contacts.Count >= _maxContacts)
+            {
+                Log(LogLevel.Warning,
+                    $"The node's contact list is full ({_contacts.Count} of {_maxContacts}). It can't learn new stations, " +
+                    "so direct messages to a station it hasn't already saved will fail until contacts are removed.");
+            }
         }
         RaiseChanged();
     }
@@ -465,7 +497,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                         {
                             Log(LogLevel.Error, $"The node refused to save the contact: {ex.Message} (code {ex.Code}).");
                             return SendResult.Failure(ex.Code == ErrTableFull
-                                ? "Not sent: the node's contact list is full. Remove a contact in the MeshCore app and try again."
+                                ? "Not sent: the node's contact list is full, so it can't save this station. Remove some contacts on the Nodes tab, or turn on \"Recycle the oldest contact when the list is full\"."
                                 : $"Not sent: the node wouldn't save this contact ({ex.Message}).");
                         }
                         await LoadContactsAsync(ct).ConfigureAwait(false);
@@ -514,6 +546,75 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             {
                 PublishDelivery(new DeliveryUpdate(Tag(tag), DeliveryStatus.NotConfirmed, "No acknowledgement from the recipient.", null));
             }
+        }
+    }
+
+    public override int? PeerCapacity { get { lock (_gate) return _maxContacts > 0 ? _maxContacts : null; } }
+
+    public override bool? RecycleOldestWhenFull
+    {
+        get { lock (_gate) return _autoAddConfig is { } c ? (c & AutoAddOverwriteOldest) != 0 : null; }
+    }
+
+    /// <summary>
+    /// Deletes a contact from the node. The node only exchanges direct messages
+    /// with stations in this list, and the list is capped, so on a busy mesh it
+    /// can fill up and block new stations until something is removed.
+    /// </summary>
+    public override async Task<string?> RemovePeerAsync(string peerId, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        Contact? contact;
+        lock (_gate) contact = FindContact(peerId);
+        if (contact is null) return "That contact is no longer on the node.";
+        try
+        {
+            await CommandAsync(RemoveContact(contact.PublicKey), c => c is RespOk, ct).ConfigureAwait(false);
+            Log(LogLevel.Info, $"Removed contact \"{contact.Name}\" from the node.");
+            await LoadContactsAsync(ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Removing \"{contact.Name}\" failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
+        }
+    }
+
+    public override async Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        byte current;
+        byte hops;
+        lock (_gate)
+        {
+            if (_autoAddConfig is null) return "This node's firmware doesn't have that setting.";
+            current = _autoAddConfig.Value;
+            hops = _autoAddMaxHops;
+        }
+        var next = (byte)(enabled ? current | AutoAddOverwriteOldest : current & ~AutoAddOverwriteOldest);
+        try
+        {
+            await CommandAsync(SetAutoAddConfig(next, hops), c => c is RespOk, ct).ConfigureAwait(false);
+            lock (_gate) _autoAddConfig = next;
+            Log(LogLevel.Info, enabled
+                ? "The node will now recycle its oldest contact when the list is full."
+                : "The node will no longer recycle contacts; a full list stays full.");
+            RaiseChanged();
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Changing the contact-recycling setting failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
         }
     }
 

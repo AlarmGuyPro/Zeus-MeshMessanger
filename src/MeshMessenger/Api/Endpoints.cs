@@ -17,7 +17,8 @@ public sealed record ChannelDto(int Index, string Name, string Kind, bool Primar
 public sealed record NodeDto(
     string Id, string Network, string Name, string Host, int Port, bool Enabled, string State, string? Detail,
     string? Identity, bool FindIfAddressChanges, string? PendingMove, SelfDto? Self,
-    int MaxDirectTextBytes, int MaxChannelTextBytes, IReadOnlyList<ChannelDto> Channels, int PeerCount);
+    int MaxDirectTextBytes, int MaxChannelTextBytes, IReadOnlyList<ChannelDto> Channels, int PeerCount,
+    int? PeerCapacity, bool? RecycleOldestWhenFull, bool CanAnnounce);
 
 public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<string> ScanRanges, int HistoryPerConversation, long Version);
 
@@ -62,12 +63,14 @@ public sealed record LogEntryDto(DateTimeOffset At, string Level, string Text);
 
 public sealed record NodeDebugDto(
     string Id, string Name, string Network, string State, string? Detail, string Host, int Port,
-    string? Identity, SelfDto? Self, int Contacts, int ContactsHeardOnly, int Channels, bool CanAnnounce,
-    IReadOnlyList<LogEntryDto> Activity);
+    string? Identity, SelfDto? Self, int Contacts, int ContactsHeardOnly, int? ContactCapacity, int Channels,
+    bool CanAnnounce, bool? RecycleOldestWhenFull, IReadOnlyList<LogEntryDto> Activity);
 
 public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnlyList<NodeDebugDto> Nodes);
 
 public sealed record AnnounceRequest(bool? Flood);
+
+public sealed record RecycleRequest(bool Enabled);
 
 public sealed record ActionResultDto(bool Ok, string? Error, int Count);
 
@@ -230,6 +233,22 @@ internal static class Endpoints
             return Results.Ok(new ActionResultDto(error is null, error, 0));
         });
 
+        e.MapDelete("nodes/{id}/peers/{peerId}", async (string id, string peerId, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            var error = await c.RemovePeerAsync(peerId, ct);
+            return Results.Ok(new ActionResultDto(error is null, error, c.Peers.Count));
+        });
+
+        e.MapPost("nodes/{id}/recycle-oldest", async (string id, RecycleRequest body, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            var error = await c.SetRecycleOldestWhenFullAsync(body.Enabled, ct);
+            return Results.Ok(new ActionResultDto(error is null, error, 0));
+        });
+
         e.MapGet("debug", () => nodes() is { } m ? Results.Ok(Debug(m)) : Unavailable());
 
         e.MapPost("conversations", async (StartConversationRequest body, CancellationToken ct) =>
@@ -260,14 +279,14 @@ internal static class Endpoints
                 c is null ? (n.Enabled ? "disconnected" : "disabled") : Lower(c.State),
                 c?.StateDetail, c?.Host ?? n.Host, PortOf(n), n.Identity,
                 c?.Self is { } s ? new SelfDto(s.Identity, s.Name, s.ShortName, s.Firmware, s.Model, s.RadioSummary) : null,
-                peers.Count(p => p.SavedOnNode), peers.Count(p => !p.SavedOnNode),
-                c?.Channels.Count ?? 0, c?.CanAnnounce ?? false,
+                peers.Count(p => p.SavedOnNode), peers.Count(p => !p.SavedOnNode), c?.PeerCapacity,
+                c?.Channels.Count ?? 0, c?.CanAnnounce ?? false, c?.RecycleOldestWhenFull,
                 (c?.Activity ?? []).Select(a => new LogEntryDto(a.At, Lower(a.Level), a.Text)).ToArray()));
         }
         return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
     }
 
-    private const string PluginVersion = "0.2.0";
+    private const string PluginVersion = "0.2.1";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);
@@ -307,7 +326,7 @@ internal static class Endpoints
             var c = m.Connector(n.Id);
             return c is null
                 ? new NodeDto(n.Id, Lower(n.Network), DisplayName(n), n.Host, PortOf(n), n.Enabled, n.Enabled ? "disconnected" : "disabled",
-                    n.Enabled ? null : "Turned off in settings.", n.Identity, n.FindIfAddressChanges, null, null, 0, 0, [], 0)
+                    n.Enabled ? null : "Turned off in settings.", n.Identity, n.FindIfAddressChanges, null, null, 0, 0, [], 0, null, null, false)
                 : NodeToDto(n, c);
         }).ToArray();
         return new StatusDto(list, m.Config.ScanRanges ?? [], m.Config.HistoryPerConversation, m.Store.Version);
@@ -323,7 +342,7 @@ internal static class Endpoints
         c.Self is null ? null : new SelfDto(c.Self.Identity, c.Self.Name, c.Self.ShortName, c.Self.Firmware, c.Self.Model, c.Self.RadioSummary),
         c.MaxTextBytes(ConversationKind.Direct), c.MaxTextBytes(ConversationKind.Channel),
         c.Channels.Select(ch => new ChannelDto(ch.Index, ch.Name, Lower(ch.Kind), ch.Primary)).ToArray(),
-        c.Peers.Count);
+        c.Peers.Count, c.PeerCapacity, c.RecycleOldestWhenFull, c.CanAnnounce);
 
     private static PeerDto PeerToDto(PeerInfo p) => new(
         p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode);

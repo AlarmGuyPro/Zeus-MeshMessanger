@@ -22,13 +22,14 @@ public static class MeshCoreProtocol
     public const byte CmdAppStart = 1, CmdSendTxtMsg = 2, CmdSendChannelTxtMsg = 3, CmdGetContacts = 4,
         CmdSetDeviceTime = 6, CmdSendSelfAdvert = 7, CmdAddUpdateContact = 9, CmdSyncNextMessage = 10, CmdResetPath = 13,
         CmdGetBattAndStorage = 20, CmdDeviceQuery = 22, CmdSendLogin = 26, CmdSendStatusReq = 27,
-        CmdGetChannel = 31, CmdSetChannel = 32, CmdSendTracePath = 36, CmdSendPathDiscovery = 52, CmdGetStats = 56;
+        CmdRemoveContact = 15, CmdGetChannel = 31, CmdSetChannel = 32, CmdSendTracePath = 36, CmdSendPathDiscovery = 52, CmdGetStats = 56,
+        CmdSetAutoAddConfig = 58, CmdGetAutoAddConfig = 59;
 
     // Replies
     public const byte RespOk = 0, RespErr = 1, RespContactsStart = 2, RespContact = 3, RespEndOfContacts = 4,
         RespSelfInfo = 5, RespSent = 6, RespContactMsgRecv = 7, RespChannelMsgRecv = 8, RespNoMoreMessages = 10,
         RespBattAndStorage = 12, RespDeviceInfo = 13, RespContactMsgRecvV3 = 16, RespChannelMsgRecvV3 = 17,
-        RespChannelInfo = 18, RespStats = 24;
+        RespChannelInfo = 18, RespStats = 24, RespAutoAddConfig = 25;
 
     // Pushes (asynchronous)
     public const byte PushAdvert = 0x80, PushPathUpdated = 0x81, PushSendConfirmed = 0x82, PushMsgWaiting = 0x83,
@@ -97,6 +98,22 @@ public static class MeshCoreProtocol
     public static byte[] SyncNextMessage() => [CmdSyncNextMessage];
 
     public static byte[] GetBattery() => [CmdGetBattAndStorage];
+
+    /// <summary>Bit 0 of the node's auto-add config: recycle the oldest non-favourite contact when the list is full.</summary>
+    public const byte AutoAddOverwriteOldest = 1 << 0;
+
+    /// <summary>Delete a contact from the node's list. Local to the node; transmits nothing.</summary>
+    public static byte[] RemoveContact(ReadOnlySpan<byte> publicKey32)
+    {
+        var b = new byte[33];
+        b[0] = CmdRemoveContact;
+        publicKey32[..32].CopyTo(b.AsSpan(1));
+        return b;
+    }
+
+    public static byte[] GetAutoAddConfig() => [CmdGetAutoAddConfig];
+
+    public static byte[] SetAutoAddConfig(byte config, byte maxHops) => [CmdSetAutoAddConfig, config, maxHops];
 
     /// <summary>Ask the node to announce itself. 1 = flood the mesh, 0 = direct range only.</summary>
     public static byte[] SelfAdvert(bool flood) => [CmdSendSelfAdvert, (byte)(flood ? 1 : 0)];

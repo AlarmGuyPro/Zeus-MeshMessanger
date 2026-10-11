@@ -38,6 +38,11 @@ export interface NodeDto {
   detail?: string;
   identity?: string;
   findIfAddressChanges: boolean;
+  /** MeshCore: how many contacts the node can hold. A full list can't learn new stations. */
+  peerCapacity?: number;
+  /** MeshCore: whether the node recycles its oldest contact when the list is full. */
+  recycleOldestWhenFull?: boolean;
+  canAnnounce?: boolean;
   pendingMove?: string;
   self?: SelfDto;
   maxDirectTextBytes: number;
@@ -189,6 +194,8 @@ export interface NodeDebugDto {
   self?: SelfDto;
   contacts: number;
   contactsHeardOnly: number;
+  contactCapacity?: number;
+  recycleOldestWhenFull?: boolean;
   channels: number;
   canAnnounce: boolean;
   activity: LogEntryDto[];
@@ -245,6 +252,10 @@ export function createClient(api: ZeusPluginApi) {
     // Transmits. Only ever called from an explicit button press.
     announce: (nodeId: string, flood: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/announce`, { flood }),
+    removePeer: (nodeId: string, peerId: string) =>
+      call<ActionResultDto>("DELETE", `/nodes/${enc(nodeId)}/peers/${enc(peerId)}`),
+    setRecycleOldest: (nodeId: string, enabled: boolean) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/recycle-oldest`, { enabled }),
     debug: () => call<DebugDto>("GET", "/debug"),
   };
 }

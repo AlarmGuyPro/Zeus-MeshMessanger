@@ -116,6 +116,60 @@ public static class ConnectorTests
     }
 
     [Test]
+    public static async Task MeshCoreReportsAFullContactListAndCanMakeRoom()
+    {
+        // Real-hardware finding: on a busy mesh the node auto-adds every station it
+        // hears until its contact table is full, and then it can't save a new one,
+        // so direct messages to that station fail with TABLE_FULL.
+        // DEVICE_INFO carries MAX_CONTACTS/2 in one byte, so capacities are even.
+        await using var node = new FakeMeshCoreNode { MaxContacts = 4 };
+        var old = node.AddContact("W0QQ Base");
+        node.AddContact("Tower Repeater", type: 2);
+        node.AddContact("Sarah");
+        node.AddContact("KE0XYZ Mobile");
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+
+        Assert.Equal(4, c.PeerCapacity, "capacity read from the node");
+        Assert.Equal(4, c.Peers.Count(p => p.SavedOnNode), "reserved slots are not counted as contacts");
+        Assert.Equal(false, c.RecycleOldestWhenFull, "recycling off to begin with");
+
+        var wio = await node.HearUnsavedAdvertAsync("KQ4WLR Wio L1");
+        var id = Convert.ToHexString(wio).ToLowerInvariant();
+        await Assert.Eventually(() => c.Peers.Any(p => p.Id == id), "heard station listed");
+        var blocked = await c.SendAsync(new ConversationKey("mc", ConversationKind.Direct, id), "hello", default);
+        Assert.False(blocked.Ok, "refused while the list is full");
+        Assert.Contains("contact list is full", blocked.Error!, "says why");
+
+        // Making room by hand lets it through.
+        Assert.Equal(null, await c.RemovePeerAsync(Convert.ToHexString(old).ToLowerInvariant(), default), "contact removed");
+        Assert.Equal(3, c.Peers.Count(p => p.SavedOnNode), "one slot free");
+        var sent = await c.SendAsync(new ConversationKey("mc", ConversationKind.Direct, id), "hello", default);
+        Assert.True(sent.Ok, sent.Error ?? "sent once there was room");
+    }
+
+    [Test]
+    public static async Task MeshCoreCanTurnOnContactRecycling()
+    {
+        await using var node = new FakeMeshCoreNode { MaxContacts = 2 };
+        node.AddContact("W0QQ Base");
+        node.AddContact("Sarah");
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+
+        Assert.Equal(null, await c.SetRecycleOldestWhenFullAsync(true, default), "setting saved");
+        Assert.Equal(true, c.RecycleOldestWhenFull, "reported back");
+
+        var wio = await node.HearUnsavedAdvertAsync("KQ4WLR Wio L1");
+        var id = Convert.ToHexString(wio).ToLowerInvariant();
+        await Assert.Eventually(() => c.Peers.Any(p => p.Id == id), "heard station listed");
+        var sent = await c.SendAsync(new ConversationKey("mc", ConversationKind.Direct, id), "hello", default);
+        Assert.True(sent.Ok, sent.Error ?? "the node recycled a slot and sent");
+    }
+
+    [Test]
     public static async Task MeshCoreRoomPostIsFiledUnderTheRoomWithItsAuthor()
     {
         await using var node = new FakeMeshCoreNode();

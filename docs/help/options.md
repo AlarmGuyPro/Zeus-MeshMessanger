@@ -25,6 +25,8 @@ so it costs the whole mesh airtime, not just yours.
 | Re-pair | Zeus remembers each node's identity and refuses a different node at the same address. Use Re-pair after re-flashing or replacing the board. | No | — |
 | Port | TCP port. Meshtastic 4403, MeshCore 5000 unless your firmware was built differently. | No | 4403 / 5000 |
 | Enabled | Off disconnects Zeus from the node without deleting its conversations. | No | On |
+| Recycle the oldest contact when the list is full (MeshCore) | A setting on the node. With it on, the node drops its oldest non-favourite contact to make room for a new one, so a full list never blocks new stations. With it off, a full list stays full and direct messages to new stations fail. | No | Off (the node's own default) |
+| Remove (a contact, MeshCore) | Deletes that contact from the node's list, freeing a slot. | No | — |
 | Re-read from node | Asks the node for its contact or node list again. Useful after adding a contact in the phone app. | No | — |
 | Send advert (MeshCore) | Announces this node on the air so other stations can add it and message you. | When you press it | — |
 | Search this list | Filters the Nodes list by name, short name, type or key. Local to Zeus. | No | — |

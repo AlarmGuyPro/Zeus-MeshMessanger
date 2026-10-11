@@ -23,7 +23,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
     node?.id,
   ]);
   const [search, setSearch] = useState("");
-  const [busy, setBusy] = useState<"refresh" | "advert" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | "advert" | "recycle" | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
 
   const all = peers.kind === "ready" ? peers.data : [];
@@ -33,13 +34,38 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
 
   if (!node) return null;
 
-  const run = async (what: "refresh" | "advert", action: () => Promise<{ ok?: boolean; error?: string }>) => {
+  const capacity = node?.peerCapacity;
+  const saved = all.filter((p) => p.savedOnNode).length;
+  const full = capacity !== undefined && saved >= capacity;
+  const nearlyFull = capacity !== undefined && !full && saved >= capacity * 0.9;
+
+  const remove = async (peerId: string, name: string) => {
+    setRemoving(peerId);
+    setNote(null);
+    try {
+      const result = await client.removePeer(node.id, peerId);
+      setNote(
+        result.ok
+          ? { kind: "ok", text: `Removed ${name} from the node.` }
+          : { kind: "warn", text: result.error ?? "Couldn’t remove it." },
+      );
+      reloadPeers();
+      onChanged();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const run = async (what: "refresh" | "advert" | "recycle", action: () => Promise<{ ok?: boolean; error?: string }>) => {
     setBusy(what);
     setNote(null);
     try {
       const result = await action();
       if (result.ok === false) setNote({ kind: "warn", text: result.error ?? "That didn’t work." });
       else if (what === "refresh") setNote({ kind: "ok", text: "Contacts re-read from the node." });
+      else if (what === "recycle") setNote({ kind: "ok", text: "Saved on the node." });
       else setNote({ kind: "ok", text: "Advert sent. Other stations will list this node shortly." });
       reloadPeers();
       onChanged();
@@ -125,6 +151,40 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
           </p>
         )}
 
+        {capacity !== undefined && (full || nearlyFull) && (
+          <div className={`${cx("notice")} ${cx("notice--warn")}`} role="status">
+            <strong>
+              The node’s contact list is {full ? "full" : "nearly full"} ({saved} of {capacity}).
+            </strong>{" "}
+            {full
+              ? "It cannot save any more stations, so a direct message to a station it hasn’t already saved will fail. Remove contacts you don’t need below, or let the node recycle the oldest one automatically."
+              : "Once it is full the node can’t save new stations, and direct messages to them fail."}{" "}
+            On a busy mesh the node adds every station it hears, so the list fills on its own.
+          </div>
+        )}
+
+        {node.recycleOldestWhenFull !== undefined && node.recycleOldestWhenFull !== null && (
+          <>
+            <label className={cx("row")}>
+              <input
+                type="checkbox"
+                checked={node.recycleOldestWhenFull}
+                disabled={busy !== null || node.state !== "connected"}
+                onChange={(e) =>
+                  void run("recycle", () => client.setRecycleOldest(node.id, e.target.checked))
+                }
+              />
+              <span>Recycle the oldest contact when the list is full</span>
+              <span className={cx("tx-label")}>Transmits: no</span>
+            </label>
+            <p className={cx("help")}>
+              A setting on the node itself. With it on, the node drops its oldest non-favourite contact to make room for
+              a new one, so the list never blocks new stations. With it off, a full list stays full until you remove
+              something.
+            </p>
+          </>
+        )}
+
         <label className={cx("field")}>
           <span>Search this list</span>
           <input
@@ -153,7 +213,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         {list.length > 0 && (
           <>
             <p className={cx("help")}>
-              Showing {list.length} of {all.length}.
+              Showing {list.length} of {all.length}
+              {capacity !== undefined ? ` · ${saved} of ${capacity} contact slots used on the node` : ""}.
             </p>
             <div className={cx("scroll-x")}>
               <table className={cx("table")}>
@@ -165,6 +226,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                     <th className={cx("num")}>SNR</th>
                     <th className={cx("num")}>Hops</th>
                     <th className={cx("num")}>Batt</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -196,6 +258,19 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                       <td className={cx("num")}>{p.hops ?? "—"}</td>
                       <td className={cx("num")}>
                         {p.batteryPercent !== undefined && p.batteryPercent !== null ? `${p.batteryPercent}%` : "—"}
+                      </td>
+                      <td>
+                        {p.savedOnNode && node.network === "meshcore" && (
+                          <button
+                            type="button"
+                            className={cx("button")}
+                            disabled={removing !== null || node.state !== "connected"}
+                            title={`Remove ${p.name} from the node's contact list`}
+                            onClick={() => void remove(p.id, p.name)}
+                          >
+                            {removing === p.id ? "Removing…" : "Remove"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

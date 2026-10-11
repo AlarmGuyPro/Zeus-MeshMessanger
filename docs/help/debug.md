@@ -27,7 +27,7 @@ ones:
 |---|---|
 | The node had no free packet buffer | The node is busy on the air and had nowhere to put the message. Wait a few seconds and send again. |
 | This station isn't in your node's contacts | Your node has never heard this station. Ask them to send an advert, then try again. |
-| The node's contact list is full | Remove some contacts in the MeshCore app. |
+| The node's contact list is full | The node can only hold so many stations and has no room for this one. See below. |
 | No acknowledgement arrived | It went out, but nothing confirmed it. On a channel that is normal; on a direct message the other station may be off or out of range. |
 | … is not connected | Zeus has lost its Wi-Fi connection to your own node. Check the Nodes tab. |
 
@@ -47,7 +47,24 @@ and nodes that hear it list it. So:
 - **Re-read from node** re-reads the list from the node, which helps after
   adding a contact in the phone app.
 
-A node can be set to add contacts **manually** (the MeshCore app's setting).
+## The contact list is full
+
+A MeshCore node holds a fixed number of contacts (350 in the build from the
+setup guide). On a busy mesh it adds **every** station it hears, so the list
+fills up on its own — and once full it cannot save a new station, so direct
+messages to anyone it hasn't already saved fail.
+
+The Nodes tab shows how many slots are used and warns when the list is full or
+nearly full. Two ways out:
+
+- **Recycle the oldest contact when the list is full** — a setting on the node.
+  With it on, the node drops its oldest non-favourite contact to make room, so
+  the list never blocks a new station again. This is the one to use.
+- **Remove** next to any contact deletes it from the node, freeing a slot.
+
+Neither transmits anything.
+
+A node can also be set to add contacts **manually** (the MeshCore app's setting).
 Then an advert it hears shows as **heard · not saved**: the node knows the
 station but won't message it yet. Zeus saves such a station on the node
 automatically the first time you message it, so you don't have to do anything.

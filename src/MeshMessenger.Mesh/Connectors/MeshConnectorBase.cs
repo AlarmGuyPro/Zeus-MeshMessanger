@@ -148,6 +148,16 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     public virtual Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
 
+    public virtual int? PeerCapacity => null;
+
+    public virtual bool? RecycleOldestWhenFull => null;
+
+    public virtual Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) =>
+        Task.FromResult<string?>($"{DisplayName} doesn't keep a contact list Zeus can change.");
+
+    public virtual Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct) =>
+        Task.FromResult<string?>($"{DisplayName} has no such setting.");
+
     /// <summary>Operator accepted the pending move.</summary>
     public bool AcceptMove()
     {

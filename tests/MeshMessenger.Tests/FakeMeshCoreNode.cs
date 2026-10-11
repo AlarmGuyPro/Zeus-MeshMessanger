@@ -32,6 +32,11 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
     public bool AckDirectMessages { get; set; } = true;
     /// <summary>Makes sends fail the way the firmware does when its packet pool is empty.</summary>
     public bool FailSends { get; set; }
+    /// <summary>MAX_CONTACTS in the firmware build; DEVICE_INFO reports half of it.</summary>
+    public int MaxContacts { get; set; } = 350;
+    public byte AutoAddConfig { get; set; }
+    /// <summary>The firmware's reserved scratch slots, sent by its contacts iterator.</summary>
+    public int ReservedSlots { get; set; } = 8;
     public int Connections;
 
     public FakeMeshCoreNode(string address = "127.0.0.1", int port = 0, byte[]? publicKey = null)
@@ -172,7 +177,7 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 var f = new byte[82];
                 f[0] = RespDeviceInfo;
                 f[1] = 13;
-                f[2] = 175;
+                f[2] = (byte)(MaxContacts / 2);
                 f[3] = (byte)Math.Max(8, ChannelSlots.Count);
                 Encoding.ASCII.GetBytes("1 Oct 2026").CopyTo(f, 8);
                 Encoding.ASCII.GetBytes("Heltec V4").CopyTo(f, 20);
@@ -206,6 +211,12 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 start[0] = RespContactsStart;
                 BinaryPrimitives.WriteUInt32LittleEndian(start.AsSpan(1), (uint)Contacts.Count);
                 await WriteAsync(s, start);
+                for (var r = 0; r < ReservedSlots; r++)
+                {
+                    var blank = new byte[ContactFrameLength];
+                    blank[0] = RespContact; // all-zero key, type NONE
+                    await WriteAsync(s, blank);
+                }
                 foreach (var (key, type, name) in Contacts)
                 {
                     var f = new byte[ContactFrameLength];
@@ -290,11 +301,34 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 var key = cmd.AsSpan(1, 32).ToArray();
                 if (!Contacts.Any(c => c.Key.AsSpan().SequenceEqual(key)))
                 {
+                    if (Contacts.Count >= MaxContacts)
+                    {
+                        if ((AutoAddConfig & AutoAddOverwriteOldest) == 0)
+                        {
+                            await WriteAsync(s, [RespErr, ErrTableFull]);
+                            break;
+                        }
+                        Contacts.RemoveAt(0); // recycle the oldest, as the firmware does
+                    }
                     Contacts.Add((key, cmd[33], ZString(cmd.AsSpan(100, 32)) ?? ""));
                 }
                 await WriteAsync(s, [RespOk]);
                 break;
             }
+            case CmdRemoveContact:
+            {
+                var key = cmd.AsSpan(1, 32).ToArray();
+                var removed = Contacts.RemoveAll(c => c.Key.AsSpan().SequenceEqual(key));
+                await WriteAsync(s, removed > 0 ? [RespOk] : [RespErr, ErrNotFound]);
+                break;
+            }
+            case CmdGetAutoAddConfig:
+                await WriteAsync(s, [RespAutoAddConfig, AutoAddConfig, 0]);
+                break;
+            case CmdSetAutoAddConfig:
+                AutoAddConfig = cmd[1];
+                await WriteAsync(s, [RespOk]);
+                break;
             case CmdGetBattAndStorage:
                 await WriteAsync(s, [RespBattAndStorage, 0x10, 0x10, 0, 0, 0, 0, 0, 0, 0, 0]);
                 break;
