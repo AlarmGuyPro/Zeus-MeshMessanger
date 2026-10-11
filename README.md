@@ -6,6 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
+| [v0.1.1](v0.1.1/io.github.alarmguypro.meshmessenger-0.1.1.zip) | main @ fix for MeshCore manual-add contacts | First real-hardware fixes |
 | [v0.1.0](v0.1.0/io.github.alarmguypro.meshmessenger-0.1.0.zip) | main @ 904552f | Pre-release, not yet tested on real nodes |
 
 Install: Zeus → Features → Community → Install local feature → choose the ZIP.
