@@ -265,6 +265,9 @@ export function createClient(api: ZeusPluginApi) {
       call<ActionResultDto>("DELETE", `/nodes/${enc(nodeId)}/peers/${enc(peerId)}`),
     setFavourite: (nodeId: string, peerId: string, favourite: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/peers/${enc(peerId)}/favourite`, { favourite }),
+    /** Clears contacts off the node. `preview` counts them instead, so nothing happens without a confirmation. */
+    cleanupPeers: (nodeId: string, what: { repeaters?: boolean; notHeardDays?: number }, preview: boolean) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/peers/cleanup`, { ...what, preview }),
     setRecycleOldest: (nodeId: string, enabled: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/recycle-oldest`, { enabled }),
     debug: () => call<DebugDto>("GET", "/debug"),

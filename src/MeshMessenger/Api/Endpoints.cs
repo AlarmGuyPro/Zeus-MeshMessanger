@@ -79,6 +79,9 @@ public sealed record FavouriteRequest(bool Favourite);
 
 public sealed record ActionResultDto(bool Ok, string? Error, int Count);
 
+/// <summary>Which contacts to clear off a node. <c>Preview</c> counts them without removing anything.</summary>
+public sealed record CleanupRequest(bool? Repeaters, int? NotHeardDays, bool? Preview);
+
 /// <summary>
 /// HTTP surface under <c>/api/plugins/io.github.alarmguypro.meshmessenger/</c>.
 /// Note there is no endpoint that sends "on network X": replies are addressed
@@ -265,6 +268,24 @@ internal static class Endpoints
             return Results.Ok(new ActionResultDto(error is null, error, c.Peers.Count));
         });
 
+        e.MapPost("nodes/{id}/peers/cleanup", async (string id, CleanupRequest body, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            var doomed = Doomed(c, body).ToList();
+            // Preview first: the panel shows the count and asks before anything is removed.
+            if (body.Preview == true) return Results.Ok(new ActionResultDto(true, null, doomed.Count));
+            var removed = 0;
+            string? failure = null;
+            foreach (var p in doomed)
+            {
+                var error = await c.RemovePeerAsync(p.Id, ct).ConfigureAwait(false);
+                if (error is null) removed++;
+                else failure ??= error;
+            }
+            return Results.Ok(new ActionResultDto(failure is null, failure, removed));
+        });
+
         e.MapPost("nodes/{id}/recycle-oldest", async (string id, RecycleRequest body, CancellationToken ct) =>
         {
             if (nodes() is not { Router: { } r }) return Unavailable();
@@ -296,6 +317,25 @@ internal static class Endpoints
             }
             return ToResult(await r.StartAsync(body.ConnectorId, kind, body.Peer ?? "", body.Text ?? "", ct));
         });
+    }
+
+    /// <summary>
+    /// The contacts a cleanup would remove. Favourites are never touched —
+    /// that is the whole point of starring someone — and neither are rooms,
+    /// since losing a room server costs you the room. A station whose age we
+    /// don't know is left alone rather than guessed at.
+    /// </summary>
+    private static IEnumerable<PeerInfo> Doomed(IMeshConnector c, CleanupRequest body)
+    {
+        var cutoff = body.NotHeardDays is > 0 ? DateTimeOffset.UtcNow.AddDays(-body.NotHeardDays.Value) : (DateTimeOffset?)null;
+        foreach (var p in c.Peers)
+        {
+            if (p.Favorite || p.Kind == PeerKind.Room || !p.SavedOnNode) continue;
+            if (body.Repeaters == true && p.Kind == PeerKind.Repeater) { yield return p; continue; }
+            if (cutoff is null) continue;
+            var seen = p.LastHeard ?? p.LastUpdated;
+            if (seen is not null && seen < cutoff) yield return p;
+        }
     }
 
     /// <summary>True when the id names a conversation Zeus shows, even if nothing is stored for it yet.</summary>

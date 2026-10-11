@@ -33,6 +33,12 @@ function heardTitle(p: PeerDto): string {
 }
 
 /** Heard nodes / contacts for each of our nodes. */
+/** Which contacts a tidy-up would clear off the node. */
+interface CleanupWhat {
+  repeaters?: boolean;
+  notHeardDays?: number;
+}
+
 export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: NodeDto[]; onChanged: () => void }) {
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? "");
   const node = nodes.find((n) => n.id === nodeId) ?? nodes[0];
@@ -42,7 +48,9 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
   ]);
   const [search, setSearch] = useState("");
   const [showRepeaters, setShowRepeaters] = useState(false);
-  const [busy, setBusy] = useState<"refresh" | "advert" | "recycle" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | "advert" | "recycle" | "cleanup" | null>(null);
+  const [staleDays, setStaleDays] = useState(30);
+  const [cleanup, setCleanup] = useState<{ what: CleanupWhat; label: string; count: number } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [starring, setStarring] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
@@ -106,6 +114,44 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
       setNote({ kind: "warn", text: errorText(err) });
     } finally {
       setRemoving(null);
+    }
+  };
+
+  // Two steps on purpose: ask the node how many would go, show that number, and
+  // only remove anything after the operator has seen it and said yes.
+  const proposeCleanup = async (what: CleanupWhat, label: string) => {
+    setBusy("cleanup");
+    setNote(null);
+    try {
+      const result = await client.cleanupPeers(node.id, what, true);
+      if (!result.ok) setNote({ kind: "warn", text: result.error ?? "Couldn’t check the list." });
+      else if (result.count === 0) setNote({ kind: "ok", text: `Nothing to remove — no ${label}.` });
+      else setCleanup({ what, label, count: result.count });
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const confirmCleanup = async () => {
+    if (!cleanup) return;
+    setBusy("cleanup");
+    setNote(null);
+    try {
+      const result = await client.cleanupPeers(node.id, cleanup.what, false);
+      setNote(
+        result.ok
+          ? { kind: "ok", text: `Removed ${result.count} contact${result.count === 1 ? "" : "s"} from the node.` }
+          : { kind: "warn", text: result.error ?? "Couldn’t remove them all." },
+      );
+      setCleanup(null);
+      reloadPeers();
+      onChanged();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -232,6 +278,68 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
               a new one, so the list never blocks new stations. With it off, a full list stays full until you remove
               something.
             </p>
+          </>
+        )}
+
+        {capacity !== undefined && capacity !== null && all.length > 0 && (
+          <>
+            <div className={cx("row")}>
+              <strong>Tidy the list</strong>
+              <span className={cx("grow")} />
+              <span className={cx("tx-label")}>Transmits: no</span>
+            </div>
+            <div className={cx("row")}>
+              <button
+                type="button"
+                className={cx("button")}
+                disabled={busy !== null || repeaters === 0}
+                onClick={() => void proposeCleanup({ repeaters: true }, "repeaters to remove")}
+              >
+                Remove all repeaters{repeaters > 0 ? ` (${repeaters})` : ""}
+              </button>
+              <button
+                type="button"
+                className={cx("button")}
+                disabled={busy !== null}
+                onClick={() => void proposeCleanup({ notHeardDays: staleDays }, `contacts that old`)}
+              >
+                Remove any not heard in
+              </button>
+              <select
+                className={cx("input")}
+                style={{ width: "auto" }}
+                aria-label="How old a contact must be to remove it"
+                value={staleDays}
+                onChange={(e) => setStaleDays(Number(e.target.value))}
+              >
+                <option value={7}>7 days</option>
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+              </select>
+            </div>
+            <p className={cx("help")}>
+              Removing a contact frees a slot on the node and nothing else — the other station keeps its copy of you,
+              and nothing goes out on the air. <strong>Favourites and room servers are never removed</strong>, nor is
+              any station whose age the node doesn’t know.
+            </p>
+            {cleanup && (
+              <div className={cx("thread-tools")}>
+                <span className={cx("warn")}>
+                  Remove {cleanup.count} contact{cleanup.count === 1 ? "" : "s"} from {node.name}?
+                </span>
+                <button
+                  type="button"
+                  className={`${cx("button")} ${cx("button--primary")}`}
+                  disabled={busy !== null}
+                  onClick={() => void confirmCleanup()}
+                >
+                  {busy === "cleanup" ? "Removing…" : "Remove them"}
+                </button>
+                <button type="button" className={cx("button")} disabled={busy !== null} onClick={() => setCleanup(null)}>
+                  Keep them
+                </button>
+              </div>
+            )}
           </>
         )}
 

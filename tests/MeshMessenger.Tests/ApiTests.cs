@@ -160,6 +160,50 @@ public static class ApiTests
         Assert.Equal(0, (await host.DirectConversationsAsync()).Count, "gone from the list");
     }
 
+    /// <summary>
+    /// Clearing repeaters off a full node must never cost the operator anything
+    /// they chose to keep: a favourite is exactly the thing you starred so it
+    /// would survive, and a room server is the room itself.
+    /// </summary>
+    [Test]
+    public static async Task CleanupRemovesRepeatersButNeverFavouritesOrRooms()
+    {
+        await using var node = new FakeMeshCoreNode();
+        node.AddContact("Tower Repeater", type: 2);
+        var kept = node.AddContact("Hilltop Repeater", type: 2);
+        node.AddContact("Shack Board", type: 3);
+        node.AddContact("KE0XYZ Mobile");
+        await using var host = await PluginHost.StartAsync(new FakePluginContext());
+        await host.PostAsync("nodes", new { network = "meshcore", host = $"127.0.0.1:{node.Port}", name = "" });
+        await Assert.Eventually(() => host.GetAsync("status").Result["nodes"]![0]!["state"]!.GetValue<string>() == "connected", "connected");
+        var nodeId = (await host.GetAsync("status"))["nodes"]![0]!["id"]!.GetValue<string>();
+
+        // Star one of the repeaters: it must then survive a sweep of repeaters.
+        var keptId = Convert.ToHexString(kept).ToLowerInvariant();
+        var (starred, _) = await host.PostAsync($"nodes/{nodeId}/peers/{keptId}/favourite", new { favourite = true });
+        Assert.Equal(HttpStatusCode.OK, starred, "favourite set");
+        await Assert.Eventually(
+            () => host.GetAsync($"nodes/{nodeId}/peers").Result.AsArray().Any(p => p!["favorite"]!.GetValue<bool>()),
+            "favourite visible");
+
+        // Preview counts without touching anything.
+        var (previewStatus, preview) = await host.PostAsync($"nodes/{nodeId}/peers/cleanup", new { repeaters = true, preview = true });
+        Assert.Equal(HttpStatusCode.OK, previewStatus, "preview accepted");
+        Assert.Equal(1, preview!["count"]!.GetValue<int>(), "only the unstarred repeater is doomed");
+        Assert.Equal(4, (await host.GetAsync($"nodes/{nodeId}/peers")).AsArray().Count, "preview removed nothing");
+
+        var (_, done) = await host.PostAsync($"nodes/{nodeId}/peers/cleanup", new { repeaters = true, preview = false });
+        Assert.True(done!["ok"]!.GetValue<bool>(), $"cleanup ran: {done}");
+        Assert.Equal(1, done["count"]!.GetValue<int>(), "one removed");
+
+        var left = (await host.GetAsync($"nodes/{nodeId}/peers")).AsArray()
+            .Select(p => p!["name"]!.GetValue<string>()).ToList();
+        Assert.Equal(3, left.Count, "three contacts left");
+        Assert.True(left.Contains("Hilltop Repeater"), "the favourite repeater survived");
+        Assert.True(left.Contains("Shack Board"), "the room server survived");
+        Assert.True(left.Contains("KE0XYZ Mobile"), "the station survived");
+    }
+
     [Test]
     public static async Task JoinedChannelsAreListedAndCanBePostedToBeforeAnyTraffic()
     {

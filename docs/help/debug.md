@@ -60,6 +60,10 @@ The Nodes tab shows how many slots are used. Three ways to keep it healthy:
   With it on, the node drops its oldest non-favourite contact to make room, so
   the list never blocks a new station again. This is the one to use.
 - **Remove** next to any contact deletes it from the node, freeing a slot.
+- **Tidy the list** clears out a lot at once: every repeater, or every station
+  not heard in 7, 30 or 90 days. Zeus counts them and asks before removing
+  anything. Favourites and room servers are never included, and neither is a
+  station whose age the node doesn't know.
 - **☆ next to a contact** makes it a favourite. Recycling never drops a
   favourite, so star the stations you actually message and they will survive
   any amount of repeater traffic.
