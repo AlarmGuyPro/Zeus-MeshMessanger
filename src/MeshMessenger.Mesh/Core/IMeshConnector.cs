@@ -43,6 +43,15 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Re-reads the node's contact or peer list. Local to the node; transmits nothing.</summary>
     Task RefreshPeersAsync(CancellationToken ct);
 
+    /// <summary>
+    /// The peers a direct conversation could be opened with for whoever sent a
+    /// channel or room message. Meshtastic carries the sender's node number in
+    /// the packet, so the answer is exact. MeshCore channel frames carry no
+    /// sender key at all — the only identity is a self-asserted name in the
+    /// text — so there the answer may be none, one or several contacts.
+    /// </summary>
+    IReadOnlyList<string> ResolveSenderPeers(ConversationKind kind, string fromId, string? fromName);
+
     /// <summary>How many contacts the node can hold, when the firmware reports it. A full list can't learn new stations.</summary>
     int? PeerCapacity { get; }
 

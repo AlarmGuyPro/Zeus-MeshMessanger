@@ -69,6 +69,39 @@ public static class ConnectorTests
         Assert.True(got[1].Reception!.Direct, "direct route");
     }
 
+    /// <summary>
+    /// A MeshCore channel frame carries no sender key, so the only way to answer
+    /// a channel sender privately is to match the self-asserted name against the
+    /// node's contacts. That must find the contact when it exists, find nothing
+    /// when it doesn't, and offer both when a name is ambiguous — never guess.
+    /// </summary>
+    [Test]
+    public static async Task MeshCoreResolvesAChannelSenderOnlyByNameAndSaysWhenItCannot()
+    {
+        await using var node = new FakeMeshCoreNode();
+        var mobile = node.AddContact("KE0XYZ Mobile");
+        node.AddContact("Tower Repeater", type: 2);
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+
+        var hex = Convert.ToHexString(mobile).ToLowerInvariant();
+        var found = c.ResolveSenderPeers(ConversationKind.Channel, "KE0XYZ Mobile", "KE0XYZ Mobile");
+        Assert.Equal(1, found.Count, "known name resolves to one contact");
+        Assert.Equal(hex, found[0], "resolves to that contact's key");
+
+        // Case and surrounding whitespace are not identity; neither is a stranger.
+        Assert.Equal(1, c.ResolveSenderPeers(ConversationKind.Channel, "x", " ke0xyz mobile ").Count, "match ignores case and padding");
+        Assert.Equal(0, c.ResolveSenderPeers(ConversationKind.Channel, "ZERO", "ZERO").Count, "unknown name resolves to nobody");
+
+        // Repeaters are contacts but not people to message.
+        Assert.Equal(0, c.ResolveSenderPeers(ConversationKind.Channel, "Tower Repeater", "Tower Repeater").Count, "repeaters are not offered");
+
+        // A room post is signed, so the id is real — but only if we hold it.
+        Assert.Equal(1, c.ResolveSenderPeers(ConversationKind.Room, hex, "KE0XYZ Mobile").Count, "known room author resolves");
+        Assert.Equal(0, c.ResolveSenderPeers(ConversationKind.Room, "deadbeef", null).Count, "unheld room author does not");
+    }
+
     [Test]
     public static async Task MeshCoreDirectMessageIsSentThenDelivered()
     {

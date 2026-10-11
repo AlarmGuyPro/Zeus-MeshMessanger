@@ -31,7 +31,9 @@ public sealed record ReceptionDto(double? Snr, int? Rssi, int? Hops, bool Direct
 
 public sealed record MessageDto(
     string Id, string Direction, string FromId, string? FromName, string Text, DateTimeOffset Timestamp,
-    string Status, string? Error, ReceptionDto? Reception, bool QueuedWhileAway, int? RoundTripMs, bool Flood);
+    string Status, string? Error, ReceptionDto? Reception, bool QueuedWhileAway, int? RoundTripMs, bool Flood,
+    /// <summary>Peers a direct conversation could be opened with for this message's sender. Only set in channel and room threads.</summary>
+    string[]? SenderPeers = null);
 
 public sealed record ConversationDto(
     string Id, string ConnectorId, string Network, string Kind, string Peer, string? Title,
@@ -175,7 +177,15 @@ internal static class Endpoints
             var messages = m.Store.Messages(id, markRead ?? true);
             // A joined channel nobody has used yet is listed but has no history: that's empty, not missing.
             if (messages is null) return Listed(m, id) ? Results.Ok(Array.Empty<MessageDto>()) : Results.NotFound();
-            return Results.Ok(messages.Select(MessageToDto).ToArray());
+            // In a channel or room thread, work out who each sender is so the
+            // operator can message them directly. Pointless in a direct thread,
+            // where there is only ever one other station.
+            IMeshConnector? connector = null;
+            if (ConversationKey.TryParse(id, out var ck) && ck.Kind != ConversationKind.Direct)
+            {
+                connector = m.Router?.Connector(ck.ConnectorId);
+            }
+            return Results.Ok(messages.Select(msg => MessageToDto(msg, SenderPeers(connector, ck.Kind, msg))).ToArray());
         });
 
         e.MapPost("conversations/{id}/mute", (string id, MuteRequest body) =>
@@ -412,8 +422,16 @@ internal static class Endpoints
         Lower(s.Conversation.Key.Kind), s.Conversation.Key.Peer, s.Conversation.Title,
         s.Last is null ? null : MessageToDto(s.Last), s.Unread, s.Muted);
 
-    private static MessageDto MessageToDto(StoredMessage m) => new(
+    /// <summary>Who an inbound channel or room message could be answered privately. Null elsewhere, so the UI shows nothing.</summary>
+    private static string[]? SenderPeers(IMeshConnector? c, ConversationKind kind, StoredMessage m)
+    {
+        if (c is null || m.Direction != MessageDirection.Inbound) return null;
+        var peers = c.ResolveSenderPeers(kind, m.FromId, m.FromName);
+        return peers.Count == 0 ? [] : peers.ToArray();
+    }
+
+    private static MessageDto MessageToDto(StoredMessage m, string[]? senderPeers = null) => new(
         m.Id, Lower(m.Direction), m.FromId, m.FromName, m.Text, m.Timestamp, Lower(m.Status), m.Error,
         m.Reception is null ? null : new ReceptionDto(m.Reception.Snr, m.Reception.Rssi, m.Reception.Hops, m.Reception.Direct, m.Reception.ViaMqtt),
-        m.QueuedWhileAway, m.RoundTripMs, m.Flood);
+        m.QueuedWhileAway, m.RoundTripMs, m.Flood, senderPeers);
 }

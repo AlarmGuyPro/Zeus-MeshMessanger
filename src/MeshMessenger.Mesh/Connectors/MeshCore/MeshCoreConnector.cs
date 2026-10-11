@@ -699,6 +699,29 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         Log(LogLevel.Info, $"Re-read the node's contacts: {_contacts.Count} saved.");
     }
 
+    /// <summary>
+    /// A MeshCore channel frame carries no sender key: the payload is encrypted
+    /// with the shared channel key and the sender is only the "Name: " prefix in
+    /// the text, which anyone on the channel can type. So the best we can do is
+    /// match that name against the node's contacts, and say honestly when that
+    /// matches nothing or more than one station. Room posts are signed, so there
+    /// the id is real — but only if we actually hold that contact.
+    /// </summary>
+    public override IReadOnlyList<string> ResolveSenderPeers(ConversationKind kind, string fromId, string? fromName)
+    {
+        if (kind != ConversationKind.Channel)
+        {
+            return Peers.Any(p => string.Equals(p.Id, fromId, StringComparison.OrdinalIgnoreCase)) ? [fromId] : [];
+        }
+        var name = (fromName ?? fromId).Trim();
+        if (name.Length == 0) return [];
+        return Peers
+            .Where(p => p.Kind is PeerKind.Chat or PeerKind.Room)
+            .Where(p => string.Equals(p.Name.Trim(), name, StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.Id)
+            .ToArray();
+    }
+
     private TimeSpan Airtime(string text, bool channel)
     {
         SelfInfoFrame? self;

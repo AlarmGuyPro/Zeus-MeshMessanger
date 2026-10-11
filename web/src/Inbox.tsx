@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   errorText,
   channelKindLabel,
@@ -41,7 +41,8 @@ const folderLabel: Record<Folder, string> = {
 export function Inbox({ client, status }: { client: Client; status: StatusDto }) {
   const [list] = usePoll(() => client.conversations(), 2000, [client, status.version]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [composingNew, setComposingNew] = useState(false);
+  // null when not composing; the object carries any prefill, e.g. from clicking a sender in a channel.
+  const [composingNew, setComposingNew] = useState<NewMessagePrefill | null>(null);
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState<Folder>("all");
 
@@ -77,7 +78,8 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
       }),
     [inFolder],
   );
-  const selected = conversations.find((c) => c.id === selectedId) ?? null;
+  // Looked up in the unfiltered list: a thread stays open while you type in the search box.
+  const selected = everything.find((c) => c.id === selectedId) ?? null;
   const nodeById = useMemo(() => new Map(status.nodes.map((n) => [n.id, n])), [status.nodes]);
   const bodyMode = selected || composingNew ? "thread" : "list";
 
@@ -90,7 +92,7 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
             className={`${cx("button")} ${cx("button--primary")}`}
             onClick={() => {
               setSelectedId(null);
-              setComposingNew(true);
+              setComposingNew({});
             }}
           >
             New message
@@ -144,7 +146,7 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
                   className={`${cx("item")} ${isSelected ? cx("item--selected") : ""}`}
                   aria-current={isSelected ? "true" : undefined}
                   onClick={() => {
-                    setComposingNew(false);
+                    setComposingNew(null);
                     setSelectedId(c.id);
                   }}
                 >
@@ -171,9 +173,10 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
         <NewConversation
           client={client}
           nodes={status.nodes}
-          onCancel={() => setComposingNew(false)}
+          prefill={composingNew}
+          onCancel={() => setComposingNew(null)}
           onStarted={(id) => {
-            setComposingNew(false);
+            setComposingNew(null);
             setSelectedId(id);
           }}
         />
@@ -186,6 +189,26 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
           version={status.version}
           onBack={() => setSelectedId(null)}
           onDeleted={() => setSelectedId(null)}
+          onMessageSender={(peers, name) => {
+            const connectorId = selected.connectorId;
+            if (peers.length === 1) {
+              const existing = everything.find((c) => c.id === `${connectorId}:dm:${peers[0]}`);
+              if (existing) {
+                setSelectedId(existing.id);
+                return;
+              }
+            }
+            setSelectedId(null);
+            setComposingNew({
+              nodeId: connectorId,
+              kind: "direct",
+              peer: peers.length === 1 ? peers[0] : undefined,
+              note:
+                peers.length > 1
+                  ? `More than one contact is called “${name}”. Names on a channel aren’t verified, so pick the right one by its key.`
+                  : undefined,
+            });
+          }}
         />
       ) : (
         <div className={cx("thread")}>
@@ -225,6 +248,48 @@ function receptionLine(m: MessageDto): string {
   return parts.join(" · ");
 }
 
+/**
+ * The sender's name above a message in a channel or room. It becomes a button
+ * when we can work out who they are, so the operator can answer them privately
+ * instead of in front of everyone. On MeshCore that depends on the name
+ * matching a contact, because a channel message carries no sender key.
+ */
+function Sender({ message, onMessage }: { message: MessageDto; onMessage: (peers: string[], name: string) => void }) {
+  const name = message.fromName ?? message.fromId;
+  const peers = message.senderPeers;
+  const style = { fontWeight: 600, fontSize: 12 } as const;
+
+  if (!peers || peers.length === 0) {
+    return (
+      <div style={style} title={peers ? "Zeus doesn’t know this station’s key, so it can’t message them privately." : undefined}>
+        {name}
+        {peers && <span className={cx("muted")}> · not in contacts</span>}
+      </div>
+    );
+  }
+  return (
+    <div style={style}>
+      <button
+        type="button"
+        className={cx("link")}
+        style={style}
+        title={peers.length > 1 ? `${peers.length} contacts share this name — pick one` : `Message ${name} directly`}
+        onClick={() => onMessage(peers, name)}
+      >
+        {name}
+      </button>
+    </div>
+  );
+}
+
+/** What clicking a channel sender, or New message, hands to the composer. */
+interface NewMessagePrefill {
+  nodeId?: string;
+  kind?: "channel" | "direct";
+  peer?: string;
+  note?: string;
+}
+
 function Thread(props: {
   client: Client;
   conversation: ConversationDto;
@@ -232,6 +297,8 @@ function Thread(props: {
   version: number;
   onBack: () => void;
   onDeleted: () => void;
+  /** Called with the peers a sender resolved to, so the panel can open or start that direct conversation. */
+  onMessageSender: (peers: string[], name: string) => void;
 }) {
   const { client, conversation, node } = props;
   const [messages, reload] = usePoll(() => client.messages(conversation.id), 2000, [
@@ -409,7 +476,7 @@ function Thread(props: {
                 }`}
               >
                 {m.direction === "inbound" && conversation.kind !== "direct" && (
-                  <div style={{ fontWeight: 600, fontSize: 12 }}>{m.fromName ?? m.fromId}</div>
+                  <Sender message={m} onMessage={props.onMessageSender} />
                 )}
                 <div>{m.text}</div>
                 <div className={cx("msg-meta")}>
@@ -487,13 +554,17 @@ function Thread(props: {
 function NewConversation(props: {
   client: Client;
   nodes: NodeDto[];
+  prefill: NewMessagePrefill;
   onCancel: () => void;
   onStarted: (conversationId: string) => void;
 }) {
-  // With more than one node, nothing is preselected: the operator must choose the network.
-  const [nodeId, setNodeId] = useState(props.nodes.length === 1 ? props.nodes[0].id : "");
-  const [kind, setKind] = useState<"channel" | "direct">("channel");
-  const [peer, setPeer] = useState("");
+  // With more than one node, nothing is preselected: the operator must choose
+  // the network — unless we already know, because this came from a message.
+  const [nodeId, setNodeId] = useState(
+    props.prefill.nodeId ?? (props.nodes.length === 1 ? props.nodes[0].id : ""),
+  );
+  const [kind, setKind] = useState<"channel" | "direct">(props.prefill.kind ?? "channel");
+  const [peer, setPeer] = useState(props.prefill.peer ?? "");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -514,7 +585,14 @@ function NewConversation(props: {
     };
   }, [nodeId, props.client]);
 
+  // Changing the node or the kind invalidates whoever was chosen. The first run
+  // is skipped so it doesn't immediately wipe a peer we were opened with.
+  const settled = useRef(props.prefill.peer === undefined);
   useEffect(() => {
+    if (!settled.current) {
+      settled.current = true;
+      return;
+    }
     setPeer(kind === "channel" && node && node.channels.length > 0 ? String(node.channels[0].index) : "");
   }, [kind, nodeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -547,6 +625,11 @@ function NewConversation(props: {
         </button>
         <strong>New message</strong>
       </div>
+      {props.prefill.note && (
+        <div className={cx("thread-tools")}>
+          <span className={cx("muted")}>{props.prefill.note}</span>
+        </div>
+      )}
       <div className={cx("composer")} style={{ flex: 1, overflowY: "auto" }}>
         <Picker
           label="Send from node (this sets the network)"

@@ -148,6 +148,13 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     public virtual Task RefreshPeersAsync(CancellationToken ct) => Task.CompletedTask;
 
+    /// <summary>
+    /// The default suits a protocol whose packets identify the sender: the id
+    /// a message came from is already the id a direct conversation uses.
+    /// </summary>
+    public virtual IReadOnlyList<string> ResolveSenderPeers(ConversationKind kind, string fromId, string? fromName) =>
+        string.IsNullOrWhiteSpace(fromId) ? [] : [fromId];
+
     public virtual int? PeerCapacity => null;
 
     public virtual bool? RecycleOldestWhenFull => null;

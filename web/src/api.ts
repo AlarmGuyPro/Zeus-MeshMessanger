@@ -99,6 +99,13 @@ export interface MessageDto {
   queuedWhileAway: boolean;
   roundTripMs?: number;
   flood: boolean;
+  /**
+   * Peers a direct conversation could be opened with for this message's sender.
+   * Only present on inbound messages in a channel or room thread. Empty means
+   * the sender can't be messaged privately — on MeshCore, because a channel
+   * message carries no sender key and the name matched no contact.
+   */
+  senderPeers?: string[];
 }
 
 export interface ConversationDto {
