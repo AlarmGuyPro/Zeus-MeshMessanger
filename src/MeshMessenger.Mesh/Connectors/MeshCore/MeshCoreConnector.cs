@@ -29,6 +29,9 @@ public sealed class MeshCoreConnector : MeshConnectorBase
     private Stream? _stream;
     private Pending? _pending;
     private Dictionary<string, Contact> _contacts = new(StringComparer.OrdinalIgnoreCase); // full key hex -> contact
+    // Heard (PUSH_NEW_ADVERT) but not saved on the node, e.g. when the node is set to add
+    // contacts manually. The node can't exchange direct messages with these until saved.
+    private Dictionary<string, (Contact Contact, byte[] Frame)> _heard = new(StringComparer.OrdinalIgnoreCase);
     private List<ChannelSlot> _slots = [];
     private SelfInfoFrame? _self;
     private int _syncRequested;
@@ -48,13 +51,17 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         {
             lock (_gate)
             {
-                return _contacts.Values.Select(c => new PeerInfo(
-                    Convert.ToHexString(c.PublicKey).ToLowerInvariant(), c.Name, null, c.Kind, c.LastAdvert,
-                    null, c.OutPathLength < 0 ? null : c.OutPathLength, null, c.Latitude, c.Longitude,
-                    (c.Flags & 1) != 0)).ToArray();
+                var saved = _contacts.Values.Select(c => ToPeer(c, true));
+                var heard = _heard.Where(h => !_contacts.ContainsKey(h.Key)).Select(h => ToPeer(h.Value.Contact, false));
+                return saved.Concat(heard).ToArray();
             }
         }
     }
+
+    private static PeerInfo ToPeer(Contact c, bool saved) => new(
+        Convert.ToHexString(c.PublicKey).ToLowerInvariant(), c.Name, null, c.Kind, c.LastAdvert,
+        null, c.OutPathLength < 0 ? null : c.OutPathLength, null, c.Latitude, c.Longitude,
+        (c.Flags & 1) != 0, saved);
 
     public override IReadOnlyList<ChannelInfo> Channels
     {
@@ -240,12 +247,14 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             }
             case PushNewAdvert when f.Length >= ContactFrameLength - 4:
             {
+                // The firmware sends NEW_ADVERT only for a node it did NOT save
+                // (manual-add mode, hop limit, or a full table); saved ones come as PUSH_ADVERT.
                 var contact = ParseContact(f);
                 lock (_gate)
                 {
-                    _contacts = new Dictionary<string, Contact>(_contacts, StringComparer.OrdinalIgnoreCase)
+                    _heard = new Dictionary<string, (Contact, byte[])>(_heard, StringComparer.OrdinalIgnoreCase)
                     {
-                        [Convert.ToHexString(contact.PublicKey)] = contact,
+                        [Convert.ToHexString(contact.PublicKey)] = (contact, f.ToArray()),
                     };
                 }
                 RaiseChanged();
@@ -414,11 +423,28 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 case ConversationKind.Direct or ConversationKind.Room:
                 {
                     byte[] prefix;
+                    byte[]? saveFirst = null;
                     lock (_gate)
                     {
                         var contact = FindContact(to.Peer);
-                        if (contact is null) return SendResult.Failure("This contact isn't in your node's contact list any more.");
+                        if (contact is null)
+                        {
+                            var heard = FindHeard(to.Peer);
+                            if (heard is null)
+                            {
+                                return SendResult.Failure("This station isn't in your node's contacts. Ask them to send an advert, then try again.");
+                            }
+                            contact = heard.Value.Contact;
+                            saveFirst = heard.Value.Frame;
+                        }
                         prefix = contact.PublicKey[..6];
+                    }
+                    if (saveFirst is not null)
+                    {
+                        // Heard but not saved: save it on the node first (local, no transmission),
+                        // as the MeshCore app does when you tap "Add contact".
+                        await CommandAsync(AddContactFromAdvert(saveFirst), c => c is RespOk, ct).ConfigureAwait(false);
+                        await LoadContactsAsync(ct).ConfigureAwait(false);
                     }
                     var f = await CommandAsync(SendDirect(prefix, ts, text), c => c is RespSent, ct).ConfigureAwait(false);
                     var sent = ParseSent(f);
@@ -474,6 +500,16 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         if (_contacts.TryGetValue(peer, out var c)) return c;
         // A peer stored by prefix only (unknown when the message arrived).
         return _contacts.Values.FirstOrDefault(x => Convert.ToHexString(x.PublicKey).StartsWith(peer, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private (Contact Contact, byte[] Frame)? FindHeard(string peer)
+    {
+        if (_heard.TryGetValue(peer, out var h)) return h;
+        foreach (var (key, value) in _heard)
+        {
+            if (key.StartsWith(peer, StringComparison.OrdinalIgnoreCase)) return value;
+        }
+        return null;
     }
 
     private Contact? FindContactByPrefix(byte[] prefix) =>

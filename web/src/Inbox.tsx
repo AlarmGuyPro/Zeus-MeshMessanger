@@ -414,6 +414,7 @@ function NewConversation(props: {
                   {p.kind === "room" ? "Room · " : ""}
                   {p.name}
                   {p.shortName ? ` (${p.shortName})` : ""}
+                  {p.savedOnNode ? "" : " — heard, will be saved on send"}
                 </option>
               ))}
             </select>

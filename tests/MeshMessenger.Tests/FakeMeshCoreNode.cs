@@ -102,6 +102,21 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
         return TickleAsync();
     }
 
+    /// <summary>An advert from a station the node doesn't save (manual-add mode): PUSH_NEW_ADVERT only.</summary>
+    public async Task<byte[]> HearUnsavedAdvertAsync(string name)
+    {
+        var key = RandomNumberGenerator.GetBytes(32);
+        var f = new byte[ContactFrameLength];
+        f[0] = PushNewAdvert;
+        key.CopyTo(f, 1);
+        f[33] = 1;
+        f[35] = 0xFF;
+        Encoding.UTF8.GetBytes(name).CopyTo(f, 100);
+        BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(132), (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        if (_client is not null) await WriteAsync(_client, f);
+        return key;
+    }
+
     private async Task TickleAsync()
     {
         if (_client is not null) await WriteAsync(_client, [PushMsgWaiting]);
@@ -257,6 +272,16 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                         await WriteAsync(s, p);
                     });
                 }
+                break;
+            }
+            case CmdAddUpdateContact:
+            {
+                var key = cmd.AsSpan(1, 32).ToArray();
+                if (!Contacts.Any(c => c.Key.AsSpan().SequenceEqual(key)))
+                {
+                    Contacts.Add((key, cmd[33], ZString(cmd.AsSpan(100, 32)) ?? ""));
+                }
+                await WriteAsync(s, [RespOk]);
                 break;
             }
             case CmdGetBattAndStorage:

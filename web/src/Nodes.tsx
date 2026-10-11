@@ -67,6 +67,11 @@ export function Nodes({ client, nodes }: { client: Client; nodes: NodeDto[] }) {
                       {p.favorite ? "★ " : ""}
                       <strong>{p.name}</strong>
                       {p.shortName ? <span className={cx("muted")}> ({p.shortName})</span> : null}
+                      {!p.savedOnNode ? (
+                        <span className={cx("chip")} title="Heard, but not saved as a contact on the node. Zeus saves it when you first message it.">
+                          heard · not saved
+                        </span>
+                      ) : null}
                       <div className={`${cx("muted")} ${cx("mono")}`} style={{ fontSize: 11 }}>
                         {p.id.length > 16 ? `${p.id.slice(0, 12)}…` : p.id}
                       </div>

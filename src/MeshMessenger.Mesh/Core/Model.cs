@@ -140,7 +140,8 @@ public sealed record PeerInfo(
     int? BatteryPercent,
     double? Latitude,
     double? Longitude,
-    bool Favorite);
+    bool Favorite,
+    bool SavedOnNode = true);
 
 public enum ChannelKind
 {

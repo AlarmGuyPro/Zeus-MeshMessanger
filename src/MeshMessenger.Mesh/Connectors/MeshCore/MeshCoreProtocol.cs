@@ -20,7 +20,7 @@ public static class MeshCoreProtocol
 
     // Commands
     public const byte CmdAppStart = 1, CmdSendTxtMsg = 2, CmdSendChannelTxtMsg = 3, CmdGetContacts = 4,
-        CmdSetDeviceTime = 6, CmdSendSelfAdvert = 7, CmdSyncNextMessage = 10, CmdResetPath = 13,
+        CmdSetDeviceTime = 6, CmdSendSelfAdvert = 7, CmdAddUpdateContact = 9, CmdSyncNextMessage = 10, CmdResetPath = 13,
         CmdGetBattAndStorage = 20, CmdDeviceQuery = 22, CmdSendLogin = 26, CmdSendStatusReq = 27,
         CmdGetChannel = 31, CmdSetChannel = 32, CmdSendTracePath = 36, CmdSendPathDiscovery = 52, CmdGetStats = 56;
 
@@ -108,6 +108,18 @@ public static class MeshCoreProtocol
         BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(3), timestamp);
         recipientKeyPrefix6[..6].CopyTo(b.AsSpan(7));
         t.CopyTo(b, 13);
+        return b;
+    }
+
+    /// <summary>
+    /// ADD_UPDATE_CONTACT built from a PUSH_NEW_ADVERT frame: the push carries
+    /// exactly the contact layout the command takes, after its own code byte.
+    /// Saving a contact is local to the node; nothing is transmitted.
+    /// </summary>
+    public static byte[] AddContactFromAdvert(ReadOnlySpan<byte> newAdvertPush)
+    {
+        var b = newAdvertPush.ToArray();
+        b[0] = CmdAddUpdateContact;
         return b;
     }
 

@@ -94,6 +94,28 @@ public static class ConnectorTests
     }
 
     [Test]
+    public static async Task MeshCoreSavesAHeardStationBeforeTheFirstDirectMessage()
+    {
+        // Real-hardware finding: with manual-add on, the node pushes NEW_ADVERT but doesn't
+        // save the contact, and SEND_TXT_MSG then fails with "not found".
+        await using var node = new FakeMeshCoreNode();
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        var wio = await node.HearUnsavedAdvertAsync("KQ4WLR Wio L1");
+        var id = Convert.ToHexString(wio).ToLowerInvariant();
+        await Assert.Eventually(() => c.Peers.Any(p => p.Id == id), "heard station listed");
+        Assert.False(c.Peers.Single(p => p.Id == id).SavedOnNode, "marked not saved");
+        Assert.Equal(0, node.Contacts.Count, "node hasn't saved it");
+
+        var sent = await c.SendAsync(new ConversationKey("mc", ConversationKind.Direct, id), "testing", default);
+        Assert.True(sent.Ok, sent.Error ?? "dm after save");
+        Assert.Equal(1, node.Contacts.Count, "saved on the node first");
+        Assert.True(c.Peers.Single(p => p.Id == id).SavedOnNode, "now saved");
+        Assert.True(node.Received.Any(r => r[0] == MeshCoreProtocol.CmdSendTxtMsg), "then sent");
+    }
+
+    [Test]
     public static async Task MeshCoreRoomPostIsFiledUnderTheRoomWithItsAuthor()
     {
         await using var node = new FakeMeshCoreNode();

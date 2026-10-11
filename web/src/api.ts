@@ -65,6 +65,8 @@ export interface PeerDto {
   latitude?: number;
   longitude?: number;
   favorite: boolean;
+  /** MeshCore: false when the node heard this station but hasn't saved it as a contact. */
+  savedOnNode: boolean;
 }
 
 export interface ReceptionDto {

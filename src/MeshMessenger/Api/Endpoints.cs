@@ -23,7 +23,7 @@ public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<strin
 
 public sealed record PeerDto(
     string Id, string Name, string? ShortName, string Kind, DateTimeOffset? LastHeard, double? Snr, int? Hops,
-    int? BatteryPercent, double? Latitude, double? Longitude, bool Favorite);
+    int? BatteryPercent, double? Latitude, double? Longitude, bool Favorite, bool SavedOnNode);
 
 public sealed record ReceptionDto(double? Snr, int? Rssi, int? Hops, bool Direct, bool ViaMqtt);
 
@@ -241,7 +241,7 @@ internal static class Endpoints
         c.Peers.Count);
 
     private static PeerDto PeerToDto(PeerInfo p) => new(
-        p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite);
+        p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode);
 
     private static DiscoveryDto Discovery(NodeManager m)
     {
