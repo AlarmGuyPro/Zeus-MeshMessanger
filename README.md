@@ -6,6 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
+| [v0.3.0](v0.3.0/io.github.alarmguypro.meshmessenger-0.3.0.zip) | main | Searchable pickers, folders, favourites |
 | [v0.2.1](v0.2.1/io.github.alarmguypro.meshmessenger-0.2.1.zip) | main | Full contact list: warning, remove, recycle |
 | [v0.2.0](v0.2.0/io.github.alarmguypro.meshmessenger-0.2.0.zip) | main @ 3ccbfe7 | Debug tab, retry/clear/delete, advert, search |
 | [v0.1.1](v0.1.1/io.github.alarmguypro.meshmessenger-0.1.1.zip) | main @ fix for MeshCore manual-add contacts | First real-hardware fixes |
