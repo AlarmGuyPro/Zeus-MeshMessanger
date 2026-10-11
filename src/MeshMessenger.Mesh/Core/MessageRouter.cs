@@ -71,6 +71,11 @@ public sealed class MessageRouter : IDisposable
         var conversation = _store.Find(conversationId);
         if (conversation is null)
         {
+            // A joined channel with no traffic yet is listed but not in the store.
+            if (ConversationKey.TryParse(conversationId, out var parsed) && _connectors.ContainsKey(parsed.ConnectorId))
+            {
+                return await StartAsync(parsed.ConnectorId, parsed.Kind, parsed.Peer, text, ct).ConfigureAwait(false);
+            }
             return RouteResult.Fail("Conversation not found.");
         }
         return await SendOnOwnConnectorAsync(conversation.Key, text, ct).ConfigureAwait(false);

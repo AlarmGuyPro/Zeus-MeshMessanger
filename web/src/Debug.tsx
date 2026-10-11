@@ -106,7 +106,15 @@ export function Debug({ client }: { client: Client }) {
           <div className={cx("row")}>
             <NetworkBadge network={node.network} />
             <h2 className={cx("h")}>{node.name}</h2>
-            <span className={node.state === "connected" ? cx("ok") : cx("muted")}>{node.state}</span>
+            <span className={node.state === "connected" ? cx("ok") : node.state === "error" ? cx("warn") : cx("muted")}>
+              {node.state === "connected"
+                ? "● Connected"
+                : node.state === "error"
+                  ? "▲ Problem"
+                  : node.state === "disabled"
+                    ? "○ Turned off"
+                    : `○ ${node.state[0].toUpperCase()}${node.state.slice(1)}`}
+            </span>
           </div>
           <p className={`${cx("help")} ${cx("mono")}`}>
             {node.host}:{node.port}

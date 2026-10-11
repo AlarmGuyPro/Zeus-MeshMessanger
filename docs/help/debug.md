@@ -54,15 +54,22 @@ setup guide). On a busy mesh it adds **every** station it hears, so the list
 fills up on its own — and once full it cannot save a new station, so direct
 messages to anyone it hasn't already saved fail.
 
-The Nodes tab shows how many slots are used and warns when the list is full or
-nearly full. Two ways out:
+The Nodes tab shows how many slots are used. Three ways to keep it healthy:
 
 - **Recycle the oldest contact when the list is full** — a setting on the node.
   With it on, the node drops its oldest non-favourite contact to make room, so
   the list never blocks a new station again. This is the one to use.
 - **Remove** next to any contact deletes it from the node, freeing a slot.
+- **☆ next to a contact** makes it a favourite. Recycling never drops a
+  favourite, so star the stations you actually message and they will survive
+  any amount of repeater traffic.
 
-Neither transmits anything.
+None of these transmit anything.
+
+With recycling on, a full list is normal and harmless: the node simply drops
+its oldest non-favourite contact when it needs room. Zeus only warns about a
+full list when recycling is **off**, because that is the case that breaks
+messaging.
 
 A node can also be set to add contacts **manually** (the MeshCore app's setting).
 Then an advert it hears shows as **heard · not saved**: the node knows the
@@ -71,6 +78,25 @@ automatically the first time you message it, so you don't have to do anything.
 
 Meshtastic nodes announce themselves regularly on their own, so their list
 fills in without any action.
+
+## A direct message needs both sides
+
+MeshCore encrypts a direct message with the recipient's public key, and the
+recipient decrypts it using the **sender's** public key — which it can only do
+if the sender is in its contact list. A node that receives a direct message
+from a station it hasn't saved cannot read it and drops it silently.
+
+So both nodes must hold each other as contacts. If a message goes out and is
+never answered, check the **other** station's contact list as well as yours.
+There is a full walkthrough in
+[Testing direct messages](direct-messages-test.md).
+
+One more trap: adverts carry the sender's own timestamp, and a node ignores an
+advert that isn't newer than the one it already stored for that station. If a
+stored timestamp is wrong — the Updated column's tooltip will say when a
+station's clock is ahead — new adverts from it are discarded as replays and
+the contact never updates. Removing the contact clears the stored timestamp so
+the next advert is accepted.
 
 ## Zeus can't reach the node
 

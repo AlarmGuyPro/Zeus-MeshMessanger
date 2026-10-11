@@ -124,21 +124,30 @@ export function Panel({ client }: { client: Client }) {
   );
 }
 
-function stateText(n: NodeDto): string {
+export function stateText(n: NodeDto): string {
   switch (n.state) {
     case "connected":
-      return "● connected";
+      return "● Connected";
     case "connecting":
-      return "… connecting";
+      return "… Connecting";
     case "searching":
-      return "… looking for it";
+      return "… Looking for it";
     case "error":
-      return "▲ problem";
+      return "▲ Problem";
     case "disabled":
-      return "○ off";
+      return "○ Turned off";
     default:
-      return "○ disconnected";
+      return "○ Not connected";
   }
+}
+
+/** The same wording and colour as the node bar, for tabs that hide the bar. */
+export function NodeState({ node }: { node: NodeDto }) {
+  return (
+    <span className={node.state === "connected" ? cx("ok") : node.state === "error" ? cx("warn") : cx("muted")}>
+      {stateText(node)}
+    </span>
+  );
 }
 
 function NodeBar({ client, nodes, onChanged }: { client: Client; nodes: NodeDto[]; onChanged: () => void }) {

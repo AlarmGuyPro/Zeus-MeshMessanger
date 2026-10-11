@@ -72,6 +72,8 @@ export interface PeerDto {
   favorite: boolean;
   /** MeshCore: false when the node heard this station but hasn't saved it as a contact. */
   savedOnNode: boolean;
+  /** When our own node last updated this record. More trustworthy than the advert's own timestamp. */
+  lastUpdated?: string;
 }
 
 export interface ReceptionDto {
@@ -254,6 +256,8 @@ export function createClient(api: ZeusPluginApi) {
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/announce`, { flood }),
     removePeer: (nodeId: string, peerId: string) =>
       call<ActionResultDto>("DELETE", `/nodes/${enc(nodeId)}/peers/${enc(peerId)}`),
+    setFavourite: (nodeId: string, peerId: string, favourite: boolean) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/peers/${enc(peerId)}/favourite`, { favourite }),
     setRecycleOldest: (nodeId: string, enabled: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/recycle-oldest`, { enabled }),
     debug: () => call<DebugDto>("GET", "/debug"),
@@ -265,6 +269,21 @@ export type Client = ReturnType<typeof createClient>;
 export const networkLabel: Record<Network, string> = {
   meshtastic: "Meshtastic",
   meshcore: "MeshCore",
+};
+
+/** Display names for the kinds the backend sends in lower case. */
+export const peerKindLabel: Record<string, string> = {
+  chat: "Station",
+  repeater: "Repeater",
+  room: "Room",
+  sensor: "Sensor",
+  unknown: "Unknown",
+};
+
+export const channelKindLabel: Record<string, string> = {
+  public: "Public",
+  hashtag: "Hashtag",
+  private: "Private",
 };
 
 export const networkShort: Record<Network, string> = {

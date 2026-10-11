@@ -170,6 +170,31 @@ public static class ConnectorTests
     }
 
     [Test]
+    public static async Task MeshCoreFavouriteIsSetOnTheNodeAndLastUpdatedComesFromOurOwnClock()
+    {
+        await using var node = new FakeMeshCoreNode();
+        var key = node.AddContact("KQ4WLR Wio L1");
+        var id = Convert.ToHexString(key).ToLowerInvariant();
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+
+        var before = c.Peers.Single(p => p.Id == id);
+        Assert.False(before.Favorite, "not a favourite to begin with");
+        // The advert's own timestamp is the sender's clock and here it is two hours ahead;
+        // LastUpdated is our node's clock, which is what the panel shows.
+        Assert.True(before.LastHeard > DateTimeOffset.UtcNow.AddHours(1), "advert time is ahead, as the field showed");
+        Assert.True(before.LastUpdated < DateTimeOffset.UtcNow, "our node's update time is in the past");
+
+        Assert.Equal(null, await c.SetPeerFavouriteAsync(id, true, default), "favourite set");
+        Assert.True(c.Peers.Single(p => p.Id == id).Favorite, "reported back as a favourite");
+        Assert.Equal(MeshCoreProtocol.ContactFlagFavourite, node.ContactFlags[Convert.ToHexString(key)], "flag written to the node");
+
+        Assert.Equal(null, await c.SetPeerFavouriteAsync(id, false, default), "favourite cleared");
+        Assert.False(c.Peers.Single(p => p.Id == id).Favorite, "no longer a favourite");
+    }
+
+    [Test]
     public static async Task MeshCoreRoomPostIsFiledUnderTheRoomWithItsAuthor()
     {
         await using var node = new FakeMeshCoreNode();

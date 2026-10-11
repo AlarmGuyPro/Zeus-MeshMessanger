@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
-import { ago, errorText, type Client, type NodeDto, type PeerDto } from "./api";
-import { NetworkBadge, usePoll } from "./Panel";
+import { ago, errorText, peerKindLabel, type Client, type NodeDto, type PeerDto } from "./api";
+import { NetworkBadge, NodeState, usePoll } from "./Panel";
 import { cx } from "./styles";
 
 function matches(p: PeerDto, needle: string): boolean {
@@ -14,6 +14,24 @@ function matches(p: PeerDto, needle: string): boolean {
   );
 }
 
+/**
+ * The tooltip for the Updated column. MeshCore stores two times: when our node
+ * last changed the record, and the timestamp the OTHER station put in its advert
+ * by its own clock, which is often wrong and sometimes in the future.
+ */
+function heardTitle(p: PeerDto): string {
+  const parts: string[] = [];
+  parts.push(p.lastUpdated ? `Your node updated this record ${new Date(p.lastUpdated).toLocaleString()}` : "Your node hasn't recorded an update time");
+  if (p.lastHeard) {
+    const advert = new Date(p.lastHeard);
+    const ahead = advert.getTime() - Date.now() > 60_000;
+    parts.push(
+      `The station's own advert says ${advert.toLocaleString()}${ahead ? " — that is in the future, so its clock is wrong" : ""}`,
+    );
+  }
+  return parts.join(". ");
+}
+
 /** Heard nodes / contacts for each of our nodes. */
 export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: NodeDto[]; onChanged: () => void }) {
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? "");
@@ -23,21 +41,54 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
     node?.id,
   ]);
   const [search, setSearch] = useState("");
+  const [showRepeaters, setShowRepeaters] = useState(false);
   const [busy, setBusy] = useState<"refresh" | "advert" | "recycle" | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [starring, setStarring] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
 
   const all = peers.kind === "ready" ? peers.data : [];
   const needle = search.trim().toLowerCase();
-  const list = useMemo(() => all.filter((p) => matches(p, needle)), [all, needle]);
+  // Searching always looks at everything, so a filter never hides what you asked for.
+  const list = useMemo(() => {
+    const found = all.filter((p) => matches(p, needle));
+    const visible = needle || showRepeaters ? found : found.filter((p) => p.kind !== "repeater");
+    return [...visible].sort((a, b) => {
+      if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+      const at = a.lastUpdated ? Date.parse(a.lastUpdated) : 0;
+      const bt = b.lastUpdated ? Date.parse(b.lastUpdated) : 0;
+      if (bt !== at) return bt - at;
+      return a.name.localeCompare(b.name);
+    });
+  }, [all, needle, showRepeaters]);
   const heardOnly = all.filter((p) => !p.savedOnNode).length;
+  const repeaters = all.filter((p) => p.kind === "repeater").length;
 
   if (!node) return null;
 
   const capacity = node?.peerCapacity;
   const saved = all.filter((p) => p.savedOnNode).length;
-  const full = capacity !== undefined && saved >= capacity;
-  const nearlyFull = capacity !== undefined && !full && saved >= capacity * 0.9;
+  const recycling = node?.recycleOldestWhenFull === true;
+  // With recycling on, a full list is the normal steady state, not a fault.
+  const blocked = capacity !== undefined && saved >= capacity && !recycling;
+
+  const star = async (peerId: string, name: string, favourite: boolean) => {
+    setStarring(peerId);
+    setNote(null);
+    try {
+      const result = await client.setFavourite(node.id, peerId, favourite);
+      setNote(
+        result.ok
+          ? { kind: "ok", text: favourite ? `${name} is a favourite and won’t be recycled.` : `${name} is no longer a favourite.` }
+          : { kind: "warn", text: result.error ?? "Couldn’t change it." },
+      );
+      reloadPeers();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setStarring(null);
+    }
+  };
 
   const remove = async (peerId: string, name: string) => {
     setRemoving(peerId);
@@ -97,6 +148,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         <div className={cx("card-head")}>
           <NetworkBadge network={node.network} />
           <h2 className={cx("h")}>{node.self?.name ?? node.name}</h2>
+          <NodeState node={node} />
           <span className={cx("muted")}>
             {[node.self?.model, node.self?.firmware, node.self?.radio].filter(Boolean).join(" · ") || node.detail}
           </span>
@@ -151,15 +203,13 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
           </p>
         )}
 
-        {capacity !== undefined && (full || nearlyFull) && (
+        {blocked && (
           <div className={`${cx("notice")} ${cx("notice--warn")}`} role="status">
             <strong>
-              The node’s contact list is {full ? "full" : "nearly full"} ({saved} of {capacity}).
+              The node’s contact list is full ({saved} of {capacity}) and recycling is off.
             </strong>{" "}
-            {full
-              ? "It cannot save any more stations, so a direct message to a station it hasn’t already saved will fail. Remove contacts you don’t need below, or let the node recycle the oldest one automatically."
-              : "Once it is full the node can’t save new stations, and direct messages to them fail."}{" "}
-            On a busy mesh the node adds every station it hears, so the list fills on its own.
+            It can’t save any more stations, so a direct message to one it hasn’t already saved will fail. Tick the box
+            below, or remove contacts you don’t need.
           </div>
         )}
 
@@ -190,10 +240,20 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
           <input
             className={cx("input")}
             value={search}
-            placeholder="Name, short name or key"
+            placeholder="Type any part of a name, short name or key"
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
+
+        {repeaters > 0 && (
+          <label className={cx("row")}>
+            <input type="checkbox" checked={showRepeaters} onChange={(e) => setShowRepeaters(e.target.checked)} />
+            <span>
+              Show repeaters ({repeaters}) — hidden by default because a busy mesh has hundreds. Search always finds
+              them.
+            </span>
+          </label>
+        )}
 
         {peers.kind === "loading" && <p className={cx("muted")}>Loading…</p>}
         {peers.kind === "error" && (
@@ -214,7 +274,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
           <>
             <p className={cx("help")}>
               Showing {list.length} of {all.length}
-              {capacity !== undefined ? ` · ${saved} of ${capacity} contact slots used on the node` : ""}.
+              {capacity !== undefined ? ` · ${saved} of ${capacity} contact slots used` : ""}
+              {capacity !== undefined ? (recycling ? " · recycling on" : " · recycling off") : ""}.
             </p>
             <div className={cx("scroll-x")}>
               <table className={cx("table")}>
@@ -222,7 +283,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                   <tr>
                     <th>Name</th>
                     <th>Type</th>
-                    <th>Heard</th>
+                    <th>Updated</th>
                     <th className={cx("num")}>SNR</th>
                     <th className={cx("num")}>Hops</th>
                     <th className={cx("num")}>Batt</th>
@@ -233,7 +294,24 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                   {list.map((p) => (
                     <tr key={p.id}>
                       <td>
-                        {p.favorite ? "★ " : ""}
+                        {node.network === "meshcore" && p.savedOnNode ? (
+                          <button
+                            type="button"
+                            className={cx("star")}
+                            aria-pressed={p.favorite}
+                            disabled={starring !== null || node.state !== "connected"}
+                            title={
+                              p.favorite
+                                ? "A favourite: the node will never recycle it"
+                                : "Make a favourite so the node never recycles it"
+                            }
+                            onClick={() => void star(p.id, p.name, !p.favorite)}
+                          >
+                            {p.favorite ? "★" : "☆"}
+                          </button>
+                        ) : p.favorite ? (
+                          "★ "
+                        ) : null}
                         <strong>{p.name}</strong>
                         {p.shortName ? <span className={cx("muted")}> ({p.shortName})</span> : null}
                         {!p.savedOnNode ? (
@@ -248,8 +326,10 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
                           {p.id.length > 16 ? `${p.id.slice(0, 12)}…` : p.id}
                         </div>
                       </td>
-                      <td>{p.kind}</td>
-                      <td className={cx("mono")}>{ago(p.lastHeard)}</td>
+                      <td>{peerKindLabel[p.kind] ?? p.kind}</td>
+                      <td className={cx("mono")} title={heardTitle(p)}>
+                        {ago(p.lastUpdated)}
+                      </td>
                       <td
                         className={`${cx("num")} ${p.snr !== undefined && p.snr !== null && p.snr < -10 ? cx("warn") : ""}`}
                       >

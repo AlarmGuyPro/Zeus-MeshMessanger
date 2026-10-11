@@ -158,6 +158,9 @@ public abstract class MeshConnectorBase : IMeshConnector
     public virtual Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct) =>
         Task.FromResult<string?>($"{DisplayName} has no such setting.");
 
+    public virtual Task<string?> SetPeerFavouriteAsync(string peerId, bool favourite, CancellationToken ct) =>
+        Task.FromResult<string?>($"{DisplayName} doesn't keep favourites Zeus can change.");
+
     /// <summary>Operator accepted the pending move.</summary>
     public bool AcceptMove()
     {

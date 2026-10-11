@@ -48,6 +48,11 @@ public sealed class PluginHost : IAsyncDisposable
         return (r.StatusCode, string.IsNullOrEmpty(text) ? null : JsonNode.Parse(text));
     }
 
+    /// <summary>Only the conversations with messages; joined channels are listed too, even when silent.</summary>
+    public async Task<List<JsonNode>> DirectConversationsAsync() =>
+        (await GetAsync("conversations")).AsArray()
+            .Where(c => c!["kind"]!.GetValue<string>() == "direct").Select(c => c!).ToList();
+
     public async Task<HttpStatusCode> DeleteAsync(string path) => (await Http.DeleteAsync(path)).StatusCode;
 
     public async ValueTask DisposeAsync()
@@ -80,8 +85,10 @@ public static class ApiTests
             Assert.Equal(146, nodeJson["maxChannelTextBytes"]!.GetValue<int>(), "channel limit reported");
 
             await node.HearDirectAsync(friend, "are you on?");
-            await Assert.Eventually(() => host.GetAsync("conversations").Result.AsArray().Count == 1, "conversation listed");
-            var conv = (await host.GetAsync("conversations"))[0]!;
+            await Assert.Eventually(() => host.DirectConversationsAsync().Result.Count == 1, "conversation listed");
+            var conv = (await host.DirectConversationsAsync())[0];
+            // The node's three channel slots are listed as well, ready to post to.
+            Assert.Equal(4, (await host.GetAsync("conversations")).AsArray().Count, "joined channels listed too");
             conversationId = conv["id"]!.GetValue<string>();
             Assert.Equal("KE0XYZ Mobile", conv["title"]!.GetValue<string>(), "titled from contacts");
             Assert.Equal(1, conv["unread"]!.GetValue<int>(), "unread");
@@ -97,8 +104,7 @@ public static class ApiTests
 
         await using (var again = await PluginHost.StartAsync(new FakePluginContext { Settings = settings }))
         {
-            var convs = await again.GetAsync("conversations");
-            Assert.Equal(1, convs.AsArray().Count, "conversation restored after restart");
+            Assert.Equal(1, (await again.DirectConversationsAsync()).Count, "conversation restored after restart");
             var messages = await again.GetAsync($"conversations/{Uri.EscapeDataString(conversationId)}/messages");
             Assert.Equal(2, messages.AsArray().Count, "both messages restored");
             await Assert.Eventually(() => again.GetAsync("status").Result["nodes"]![0]!["state"]!.GetValue<string>() == "connected", "node config restored");
@@ -138,8 +144,8 @@ public static class ApiTests
 
         // A failed send can be cleared, and the conversation deleted.
         await node.HearDirectAsync(friend, "are you on?");
-        await Assert.Eventually(() => host.GetAsync("conversations").Result.AsArray().Count == 1, "conversation listed");
-        var id = (await host.GetAsync("conversations"))[0]!["id"]!.GetValue<string>();
+        await Assert.Eventually(() => host.DirectConversationsAsync().Result.Count == 1, "conversation listed");
+        var id = (await host.DirectConversationsAsync())[0]["id"]!.GetValue<string>();
         var escaped = Uri.EscapeDataString(id);
         node.FailSends = true;
         var (_, failed) = await host.PostAsync($"conversations/{escaped}/reply", new { text = "this one fails" });
@@ -151,7 +157,28 @@ public static class ApiTests
         Assert.Equal(1, (await host.GetAsync($"conversations/{escaped}/messages")).AsArray().Count, "only the inbound one left");
 
         Assert.Equal(HttpStatusCode.OK, await host.DeleteAsync($"conversations/{escaped}"), "conversation deleted");
-        Assert.Equal(0, (await host.GetAsync("conversations")).AsArray().Count, "gone from the list");
+        Assert.Equal(0, (await host.DirectConversationsAsync()).Count, "gone from the list");
+    }
+
+    [Test]
+    public static async Task JoinedChannelsAreListedAndCanBePostedToBeforeAnyTraffic()
+    {
+        await using var node = new FakeMeshCoreNode();
+        await using var host = await PluginHost.StartAsync(new FakePluginContext());
+        await host.PostAsync("nodes", new { network = "meshcore", host = $"127.0.0.1:{node.Port}", name = "" });
+        await Assert.Eventually(() => host.GetAsync("status").Result["nodes"]![0]!["state"]!.GetValue<string>() == "connected", "connected");
+
+        var channels = (await host.GetAsync("conversations")).AsArray()
+            .Where(c => c!["kind"]!.GetValue<string>() == "channel").ToList();
+        Assert.Equal(3, channels.Count, "every joined channel listed, with no traffic yet");
+        Assert.Equal("Public", channels[0]!["title"]!.GetValue<string>(), "named from the node");
+
+        // Posting to a channel nobody has spoken on yet must work.
+        var id = Uri.EscapeDataString(channels[0]!["id"]!.GetValue<string>());
+        var (_, sent) = await host.PostAsync($"conversations/{id}/reply", new { text = "net at 19:00" });
+        Assert.True(sent!["ok"]!.GetValue<bool>(), $"posted: {sent}");
+        Assert.True(node.Received.Any(r => r[0] == MeshCoreProtocol.CmdSendChannelTxtMsg), "the node was asked to send it");
+        Assert.Equal(1, (await host.GetAsync($"conversations/{id}/messages")).AsArray().Count, "kept in the thread");
     }
 
     [Test]

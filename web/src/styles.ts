@@ -213,6 +213,72 @@ ${e("divider")}::before, ${e("divider")}::after { content: ""; flex: 1; height: 
 ${e("ok")} { color: var(--ok); }
 ${e("warn")} { color: var(--amber); }
 ${e("tx-text")} { color: var(--tx); }
+${e("star")} {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+${e("star")}[aria-pressed="true"] { color: var(--amber); }
+${e("star")}:disabled { cursor: not-allowed; }
+${e("folders")} {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--line);
+}
+${e("folder")} {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+${e("folder--on")} { border-color: var(--accent); color: var(--fg-0); background: var(--bg-2); }
+${e("picker")} { position: relative; }
+${e("picker-list")} {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 16em;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+}
+${e("picker-item")} {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+${e("picker-item")}:last-child { border-bottom: 0; }
+${e("picker-item--active")} { background: var(--bg-3); }
+${e("picker-empty")} { padding: 8px; font-size: 12px; }
 ${e("thread-tools")} {
   display: flex;
   flex-wrap: wrap;

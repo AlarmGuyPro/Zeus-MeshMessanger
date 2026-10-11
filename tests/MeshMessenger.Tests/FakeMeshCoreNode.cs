@@ -27,6 +27,7 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
     public byte[] PublicKey { get; }
     public string Name { get; set; } = "KD0ABC Shack";
     public List<(byte[] Key, int Type, string Name)> Contacts { get; } = [];
+    public Dictionary<string, byte> ContactFlags { get; } = [];
     public List<(string Name, byte[] Secret)> ChannelSlots { get; } = [];
     public ConcurrentQueue<byte[]> Received { get; } = new();
     public bool AckDirectMessages { get; set; } = true;
@@ -223,9 +224,11 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                     f[0] = RespContact;
                     key.CopyTo(f, 1);
                     f[33] = (byte)type;
+                    f[34] = ContactFlags.GetValueOrDefault(Convert.ToHexString(key), (byte)0);
                     f[35] = 1;
                     Encoding.UTF8.GetBytes(name).CopyTo(f, 100);
-                    BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(132), (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                    BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(132), (uint)DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeSeconds()); // advert clock ahead, as seen in the field
+                    BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(144), (uint)DateTimeOffset.UtcNow.AddMinutes(-30).ToUnixTimeSeconds());
                     await WriteAsync(s, f);
                 }
                 await WriteAsync(s, [RespEndOfContacts]);
@@ -299,6 +302,7 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
             case CmdAddUpdateContact:
             {
                 var key = cmd.AsSpan(1, 32).ToArray();
+                ContactFlags[Convert.ToHexString(key)] = cmd[34];
                 if (!Contacts.Any(c => c.Key.AsSpan().SequenceEqual(key)))
                 {
                     if (Contacts.Count >= MaxContacts)

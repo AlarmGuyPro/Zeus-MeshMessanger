@@ -64,7 +64,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
     private static PeerInfo ToPeer(Contact c, bool saved) => new(
         Convert.ToHexString(c.PublicKey).ToLowerInvariant(), c.Name, null, c.Kind, c.LastAdvert,
         null, c.OutPathLength < 0 ? null : c.OutPathLength, null, c.Latitude, c.Longitude,
-        (c.Flags & 1) != 0, saved);
+        c.Favourite, saved, c.LastModified);
 
     public override IReadOnlyList<ChannelInfo> Channels
     {
@@ -276,7 +276,21 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             case PushContactsFull:
                 Log(LogLevel.Warning, "The node reports its contact list is full.");
                 break;
-            case PushAdvert or PushPathUpdated or PushContactDeleted:
+            case PushAdvert when f.Length >= 33:
+            {
+                // The node heard an advert from a station it already has (or just saved).
+                var key = Convert.ToHexString(f.AsSpan(1, 32));
+                lock (_gate)
+                {
+                    var known = _contacts.TryGetValue(key, out var c);
+                    Log(LogLevel.Receive, known
+                        ? $"Heard an advert from \"{c!.Name}\" ({Short(key)}); its contact was updated."
+                        : $"Heard an advert from {Short(key)}; the node saved it as a new contact.");
+                }
+                _ = RefreshContactsSoonAsync();
+                break;
+            }
+            case PushPathUpdated or PushContactDeleted:
                 // Contact details changed; refresh on the next quiet moment.
                 _ = RefreshContactsSoonAsync();
                 break;
@@ -610,6 +624,38 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         catch (MeshCoreException ex)
         {
             Log(LogLevel.Error, $"Changing the contact-recycling setting failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
+        }
+    }
+
+    /// <summary>
+    /// Marks a contact as a favourite on the node, or clears it. The firmware never
+    /// recycles a favourite, so this is what keeps a station you message from being
+    /// dropped when the contact list fills. Local to the node; transmits nothing.
+    /// </summary>
+    public override async Task<string?> SetPeerFavouriteAsync(string peerId, bool favourite, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        Contact? contact;
+        lock (_gate) contact = FindContact(peerId);
+        if (contact is null) return "That contact is no longer on the node.";
+        if (contact.Frame is null) return "This node's firmware didn't send enough detail to change the contact.";
+        try
+        {
+            await CommandAsync(SetContactFavourite(contact, favourite), c => c is RespOk, ct).ConfigureAwait(false);
+            Log(LogLevel.Info, favourite
+                ? $"\"{contact.Name}\" is now a favourite and will never be recycled."
+                : $"\"{contact.Name}\" is no longer a favourite.");
+            await LoadContactsAsync(ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Changing the favourite flag failed: {ex.Message} (code {ex.Code}).");
             return ex.Message;
         }
         catch (Exception ex) when (ex is IOException or TimeoutException)

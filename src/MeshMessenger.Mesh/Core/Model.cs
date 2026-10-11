@@ -64,6 +64,27 @@ public sealed record ConversationKey(string ConnectorId, ConversationKind Kind, 
         ConversationKind.Direct => "dm",
         _ => "room",
     };
+
+    /// <summary>Reads back an <see cref="Id"/>. The peer may itself contain ':' so only the first two parts are split.</summary>
+    public static bool TryParse(string? id, out ConversationKey key)
+    {
+        key = new ConversationKey("", ConversationKind.Channel, "");
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        var first = id.IndexOf(':');
+        if (first <= 0) return false;
+        var second = id.IndexOf(':', first + 1);
+        if (second < 0) return false;
+        var kind = id[(first + 1)..second] switch
+        {
+            "ch" => ConversationKind.Channel,
+            "dm" => ConversationKind.Direct,
+            "room" => ConversationKind.Room,
+            _ => (ConversationKind?)null,
+        };
+        if (kind is null) return false;
+        key = new ConversationKey(id[..first], kind.Value, id[(second + 1)..]);
+        return key.Peer.Length > 0;
+    }
 }
 
 /// <summary>How a received packet arrived at our node: last hop only.</summary>
@@ -158,7 +179,9 @@ public sealed record PeerInfo(
     double? Latitude,
     double? Longitude,
     bool Favorite,
-    bool SavedOnNode = true);
+    bool SavedOnNode = true,
+    /// <summary>When our own node last updated this record. More trustworthy than the advert's own timestamp.</summary>
+    DateTimeOffset? LastUpdated = null);
 
 public enum ChannelKind
 {

@@ -27,6 +27,8 @@ so it costs the whole mesh airtime, not just yours.
 | Enabled | Off disconnects Zeus from the node without deleting its conversations. | No | On |
 | Recycle the oldest contact when the list is full (MeshCore) | A setting on the node. With it on, the node drops its oldest non-favourite contact to make room for a new one, so a full list never blocks new stations. With it off, a full list stays full and direct messages to new stations fail. | No | Off (the node's own default) |
 | Remove (a contact, MeshCore) | Deletes that contact from the node's list, freeing a slot. | No | — |
+| ☆ Favourite (a contact, MeshCore) | Marks the contact on the node so recycling never drops it. Use it for the stations you actually message. | No | Off |
+| Show repeaters | Repeaters are hidden from the Nodes list by default because a busy mesh has hundreds. Search always finds them whether or not this is ticked. | No | Off |
 | Re-read from node | Asks the node for its contact or node list again. Useful after adding a contact in the phone app. | No | — |
 | Send advert (MeshCore) | Announces this node on the air so other stations can add it and message you. | When you press it | — |
 | Search this list | Filters the Nodes list by name, short name, type or key. Local to Zeus. | No | — |
@@ -42,7 +44,8 @@ the node itself, not a transmission.
 |---|---|---|---|
 | Send / Reply | Sends your message on the conversation's own node. | When you press it | — |
 | Mute conversation | Stops unread counts and highlights for that conversation. Messages still arrive. | No | Off |
-| Search conversations | Filters the list by title, sender or message text. Local to Zeus. | No | — |
+| Search conversations | Filters the list by title, sender or message text, matching anywhere in the text. Local to Zeus. | No | — |
+| All / Direct / Channels / Rooms | Folders for the conversation list. Channels your node has joined are listed even before anyone talks on them. | No | All |
 | Send again | Sends a message that never went out, as a new transmission. The failed entry is replaced. | When you press it | — |
 | Clear them | Removes the messages in this conversation that never went out. Removed from Zeus only. | No | — |
 | Delete… | Forgets the conversation and its messages. Removed from Zeus only; the other station keeps its copy. | No | — |

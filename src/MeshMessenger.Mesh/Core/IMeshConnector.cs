@@ -55,6 +55,9 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Turns the node's "recycle the oldest contact when full" setting on or off.</summary>
     Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct);
 
+    /// <summary>Marks a contact as a favourite on the node so it is never recycled.</summary>
+    Task<string?> SetPeerFavouriteAsync(string peerId, bool favourite, CancellationToken ct);
+
     IReadOnlyList<ChannelInfo> Channels { get; }
 
     /// <summary>

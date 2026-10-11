@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   errorText,
+  channelKindLabel,
   networkLabel,
+  networkShort,
   textLimit,
   utf8Length,
   type Client,
@@ -14,6 +16,7 @@ import {
   type StatusDto,
 } from "./api";
 import { NetworkBadge, usePoll } from "./Panel";
+import { Picker, type PickerOption } from "./Picker";
 import { cx } from "./styles";
 
 function conversationTitle(c: ConversationDto): string {
@@ -23,14 +26,24 @@ function conversationTitle(c: ConversationDto): string {
 }
 
 function kindLabel(kind: Kind): string {
-  return kind === "channel" ? "channel" : kind === "room" ? "room" : "direct";
+  return kind === "channel" ? "Channel" : kind === "room" ? "Room" : "Direct";
 }
+
+type Folder = "all" | "direct" | "channel" | "room";
+
+const folderLabel: Record<Folder, string> = {
+  all: "All",
+  direct: "Direct",
+  channel: "Channels",
+  room: "Rooms",
+};
 
 export function Inbox({ client, status }: { client: Client; status: StatusDto }) {
   const [list] = usePoll(() => client.conversations(), 2000, [client, status.version]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composingNew, setComposingNew] = useState(false);
   const [search, setSearch] = useState("");
+  const [folder, setFolder] = useState<Folder>("all");
 
   const everything = list.kind === "ready" ? list.data : [];
   const needle = search.trim().toLowerCase();
@@ -43,6 +56,27 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
           (c.last?.fromName ?? "").toLowerCase().includes(needle),
       )
     : everything;
+  const counts = useMemo(() => {
+    const unread = { all: 0, direct: 0, channel: 0, room: 0 } as Record<Folder, number>;
+    for (const c of everything) {
+      unread.all += c.unread;
+      unread[c.kind] += c.unread;
+    }
+    return unread;
+  }, [everything]);
+  const inFolder = folder === "all" ? conversations : conversations.filter((c) => c.kind === folder);
+  // Unread first, then whatever has spoken most recently; silent joined channels sink to the bottom.
+  const ordered = useMemo(
+    () =>
+      [...inFolder].sort((a, b) => {
+        if ((b.unread > 0 ? 1 : 0) !== (a.unread > 0 ? 1 : 0)) return (b.unread > 0 ? 1 : 0) - (a.unread > 0 ? 1 : 0);
+        const at = a.last ? Date.parse(a.last.timestamp) : 0;
+        const bt = b.last ? Date.parse(b.last.timestamp) : 0;
+        if (bt !== at) return bt - at;
+        return conversationTitle(a).localeCompare(conversationTitle(b));
+      }),
+    [inFolder],
+  );
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
   const nodeById = useMemo(() => new Map(status.nodes.map((n) => [n.id, n])), [status.nodes]);
   const bodyMode = selected || composingNew ? "thread" : "list";
@@ -66,11 +100,26 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
               className={cx("input")}
               style={{ marginTop: 8 }}
               value={search}
-              placeholder="Search conversations"
+              placeholder="Search names and messages"
               aria-label="Search conversations"
               onChange={(e) => setSearch(e.target.value)}
             />
           )}
+        </div>
+        <div className={cx("folders")} role="tablist" aria-label="Conversation folders">
+          {(["all", "direct", "channel", "room"] as Folder[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={folder === f}
+              className={`${cx("folder")} ${folder === f ? cx("folder--on") : ""}`}
+              onClick={() => setFolder(f)}
+            >
+              {folderLabel[f]}
+              {counts[f] > 0 && <span className={cx("unread")}>{counts[f]}</span>}
+            </button>
+          ))}
         </div>
         {list.kind === "error" && (
           <p className={`${cx("notice")} ${cx("notice--warn")}`} role="alert">
@@ -81,8 +130,11 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
         {list.kind === "ready" && everything.length > 0 && conversations.length === 0 && (
           <p className={cx("notice")}>Nothing matches “{search}”.</p>
         )}
+        {list.kind === "ready" && conversations.length > 0 && ordered.length === 0 && (
+          <p className={cx("notice")}>Nothing in {folderLabel[folder]} yet.</p>
+        )}
         <ul aria-label="Conversations" style={{ margin: 0, padding: 0, listStyle: "none" }}>
-          {conversations.map((c) => {
+          {ordered.map((c) => {
             const node = nodeById.get(c.connectorId);
             const isSelected = c.id === selectedId;
             return (
@@ -107,7 +159,7 @@ export function Inbox({ client, status }: { client: Client; status: StatusDto })
                   </span>
                   <span className={cx("item-preview")}>
                     {kindLabel(c.kind)} · {node?.name ?? "removed node"}
-                    {c.last ? ` · ${c.last.text}` : ""}
+                    {c.last ? ` · ${c.last.text}` : c.kind === "channel" ? " · joined, nothing heard yet" : ""}
                   </span>
                 </button>
               </li>
@@ -488,19 +540,18 @@ function NewConversation(props: {
         <strong>New message</strong>
       </div>
       <div className={cx("composer")} style={{ flex: 1, overflowY: "auto" }}>
-        <label className={cx("field")}>
-          <span>Send from node (this sets the network)</span>
-          <select className={cx("input")} value={nodeId} onChange={(e) => setNodeId(e.target.value)}>
-            <option value="" disabled>
-              Choose a node…
-            </option>
-            {props.nodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                {networkLabel[n.network]} · {n.name} ({n.state})
-              </option>
-            ))}
-          </select>
-        </label>
+        <Picker
+          label="Send from node (this sets the network)"
+          value={nodeId}
+          placeholder="Type to search your nodes"
+          options={props.nodes.map((n) => ({
+            id: n.id,
+            label: n.name,
+            tag: networkShort[n.network],
+            detail: `${networkLabel[n.network]} · ${n.state}`,
+          }))}
+          onChange={setNodeId}
+        />
         <div className={cx("row")}>
           <button
             type="button"
@@ -516,36 +567,40 @@ function NewConversation(props: {
             aria-pressed={kind === "direct"}
             onClick={() => setKind("direct")}
           >
-            Direct / room
+            Direct / Room
           </button>
         </div>
         {kind === "channel" ? (
-          <label className={cx("field")}>
-            <span>Channel</span>
-            <select className={cx("input")} value={peer} onChange={(e) => setPeer(e.target.value)} disabled={!node}>
-              {!node && <option value="">Choose a node first</option>}
-              {node?.channels.map((c) => (
-                <option key={c.index} value={String(c.index)}>
-                  #{c.index} {c.name} ({c.kind})
-                </option>
-              ))}
-            </select>
-          </label>
+          <Picker
+            label="Channel"
+            value={peer}
+            disabled={!node}
+            emptyText="Choose a node first"
+            placeholder="Type to search channels"
+            options={(node?.channels ?? []).map((c) => ({
+              id: String(c.index),
+              label: c.name,
+              detail: `Slot ${c.index} · ${channelKindLabel[c.kind] ?? c.kind}`,
+            }))}
+            onChange={setPeer}
+          />
         ) : (
-          <label className={cx("field")}>
-            <span>To</span>
-            <select className={cx("input")} value={peer} onChange={(e) => setPeer(e.target.value)} disabled={!node}>
-              <option value="">{node ? (peers.length ? "Choose…" : "No contacts known yet") : "Choose a node first"}</option>
-              {peers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.kind === "room" ? "Room · " : ""}
-                  {p.name}
-                  {p.shortName ? ` (${p.shortName})` : ""}
-                  {p.savedOnNode ? "" : " — heard, will be saved on send"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Picker
+            label="To"
+            value={peer}
+            disabled={!node}
+            emptyText={node ? "No stations known yet — ask them to send an advert" : "Choose a node first"}
+            options={peers.map(
+              (p): PickerOption => ({
+                id: p.id,
+                label: p.name,
+                tag: p.kind === "room" ? "Room" : undefined,
+                detail: [p.shortName, p.id.length > 16 ? `${p.id.slice(0, 12)}…` : p.id].filter(Boolean).join(" · "),
+                note: p.savedOnNode ? undefined : "heard, will be saved on send",
+              }),
+            )}
+            onChange={setPeer}
+          />
         )}
         <label className={cx("field")}>
           <span>Message</span>

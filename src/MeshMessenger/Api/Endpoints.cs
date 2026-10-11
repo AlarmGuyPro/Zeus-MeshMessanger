@@ -24,7 +24,8 @@ public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<strin
 
 public sealed record PeerDto(
     string Id, string Name, string? ShortName, string Kind, DateTimeOffset? LastHeard, double? Snr, int? Hops,
-    int? BatteryPercent, double? Latitude, double? Longitude, bool Favorite, bool SavedOnNode);
+    int? BatteryPercent, double? Latitude, double? Longitude, bool Favorite, bool SavedOnNode,
+    DateTimeOffset? LastUpdated);
 
 public sealed record ReceptionDto(double? Snr, int? Rssi, int? Hops, bool Direct, bool ViaMqtt);
 
@@ -71,6 +72,8 @@ public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnly
 public sealed record AnnounceRequest(bool? Flood);
 
 public sealed record RecycleRequest(bool Enabled);
+
+public sealed record FavouriteRequest(bool Favourite);
 
 public sealed record ActionResultDto(bool Ok, string? Error, int Count);
 
@@ -162,9 +165,9 @@ internal static class Endpoints
         });
 
         // ---------------------------------------------------------------- conversations
-        e.MapGet("conversations", () => nodes() is { } m
-            ? Results.Ok(m.Store.Summaries().Select(ConversationToDto).ToArray())
-            : Unavailable());
+        // Channels the node has joined are listed even before anyone talks on them,
+        // so Public and your hashtag channels are always there to post to.
+        e.MapGet("conversations", () => nodes() is { } m ? Results.Ok(Conversations(m)) : Unavailable());
 
         e.MapGet("conversations/{id}/messages", (string id, bool? markRead) =>
         {
@@ -249,6 +252,14 @@ internal static class Endpoints
             return Results.Ok(new ActionResultDto(error is null, error, 0));
         });
 
+        e.MapPost("nodes/{id}/peers/{peerId}/favourite", async (string id, string peerId, FavouriteRequest body, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            var error = await c.SetPeerFavouriteAsync(peerId, body.Favourite, ct);
+            return Results.Ok(new ActionResultDto(error is null, error, 0));
+        });
+
         e.MapGet("debug", () => nodes() is { } m ? Results.Ok(Debug(m)) : Unavailable());
 
         e.MapPost("conversations", async (StartConversationRequest body, CancellationToken ct) =>
@@ -286,7 +297,7 @@ internal static class Endpoints
         return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
     }
 
-    private const string PluginVersion = "0.2.1";
+    private const string PluginVersion = "0.3.0";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);
@@ -345,7 +356,7 @@ internal static class Endpoints
         c.Peers.Count, c.PeerCapacity, c.RecycleOldestWhenFull, c.CanAnnounce);
 
     private static PeerDto PeerToDto(PeerInfo p) => new(
-        p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode);
+        p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode, p.LastUpdated);
 
     private static DiscoveryDto Discovery(NodeManager m)
     {
@@ -359,6 +370,25 @@ internal static class Endpoints
             new ScanDto(s.Running, s.Phase, s.Probed, s.Total, s.Networks, s.QuietNetworks, s.UsedMdns, found, s.OtherAnswers,
                 s.StartedAt, s.FinishedAt, s.Cancelled, s.Error),
             m.Discovery.DefaultNetworks());
+    }
+
+    private static ConversationDto[] Conversations(NodeManager m)
+    {
+        var list = m.Store.Summaries().Select(ConversationToDto).ToList();
+        var seen = list.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var c in m.Router?.Connectors ?? [])
+        {
+            foreach (var channel in c.Channels)
+            {
+                var key = new ConversationKey(c.Id, ConversationKind.Channel, channel.Index.ToString());
+                if (seen.Add(key.Id))
+                {
+                    list.Add(new ConversationDto(key.Id, c.Id, Lower(c.Network), "channel", key.Peer,
+                        channel.Name, null, 0, false));
+                }
+            }
+        }
+        return list.ToArray();
     }
 
     private static ConversationDto ConversationToDto(MessageStore.Summary s) => new(

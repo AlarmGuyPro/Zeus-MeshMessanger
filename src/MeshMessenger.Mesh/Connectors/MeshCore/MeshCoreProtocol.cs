@@ -189,7 +189,33 @@ public static class MeshCoreProtocol
         return new SelfInfoFrame(key, name, freq, bw, sf, cr, (sbyte)f[2]);
     }
 
-    public sealed record Contact(byte[] PublicKey, PeerKind Kind, byte Flags, int OutPathLength, string Name, DateTimeOffset? LastAdvert, double? Latitude, double? Longitude);
+    /// <summary>
+    /// A station the node knows about. <paramref name="LastAdvert"/> is the timestamp the
+    /// SENDER put in its advert, by its own clock, so it can be wrong or in the future;
+    /// <paramref name="LastModified"/> is our node's clock when it last updated the record,
+    /// which is what "heard" really means to us. The raw frame is kept so the contact can be
+    /// written back (favourite, re-save) without rebuilding it.
+    /// </summary>
+    public sealed record Contact(byte[] PublicKey, PeerKind Kind, byte Flags, int OutPathLength, string Name,
+        DateTimeOffset? LastAdvert, double? Latitude, double? Longitude, DateTimeOffset? LastModified = null,
+        byte[]? Frame = null)
+    {
+        public bool Favourite => (Flags & ContactFlagFavourite) != 0;
+    }
+
+    /// <summary>Bit 0 of a contact's flags. The firmware never recycles a favourite.</summary>
+    public const byte ContactFlagFavourite = 1 << 0;
+
+    /// <summary>Rewrites a contact with its favourite flag set or cleared. Local to the node.</summary>
+    public static byte[] SetContactFavourite(Contact contact, bool favourite)
+    {
+        var frame = contact.Frame is { Length: >= ContactFrameLength }
+            ? contact.Frame.ToArray()
+            : throw new FormatException("the contact's original frame is needed to change it");
+        frame[0] = CmdAddUpdateContact;
+        frame[34] = (byte)(favourite ? frame[34] | ContactFlagFavourite : frame[34] & ~ContactFlagFavourite);
+        return frame;
+    }
 
     public const int ContactFrameLength = 1 + 32 + 1 + 1 + 1 + 64 + 32 + 4 + 4 + 4 + 4;
 
@@ -209,8 +235,12 @@ public static class MeshCoreProtocol
             var lo = BinaryPrimitives.ReadInt32LittleEndian(f[140..]);
             if (la != 0 || lo != 0) { lat = la / 1e6; lon = lo / 1e6; }
         }
+        uint lastmod = 0;
+        if (f.Length >= 148) lastmod = BinaryPrimitives.ReadUInt32LittleEndian(f[144..]);
         return new Contact(key, kind, flags, outPath == 0xFF ? -1 : outPath & 0x3F, name,
-            advert == 0 ? null : DateTimeOffset.FromUnixTimeSeconds(advert), lat, lon);
+            advert == 0 ? null : DateTimeOffset.FromUnixTimeSeconds(advert), lat, lon,
+            lastmod == 0 ? null : DateTimeOffset.FromUnixTimeSeconds(lastmod),
+            f.Length >= ContactFrameLength ? f[..ContactFrameLength].ToArray() : null);
     }
 
     public sealed record ChannelSlot(int Index, string Name, byte[] Secret)

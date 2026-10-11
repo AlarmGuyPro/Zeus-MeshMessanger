@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useEffect, useState } from "react";
 import { errorText, networkLabel, type Client, type FoundDto, type Network, type NodeDto, type StatusDto } from "./api";
-import { NetworkBadge, usePoll } from "./Panel";
+import { NetworkBadge, NodeState, usePoll } from "./Panel";
 import { cx } from "./styles";
 
 function TxNo() {
@@ -193,7 +193,7 @@ function ManualAdd({ client, onAdded }: { client: Client; onAdded: () => void })
         <span>Network</span>
         <select className={cx("input")} value={network} onChange={(e) => setNetwork(e.target.value as Network)}>
           <option value="" disabled>
-            Choose…
+            Choose a network…
           </option>
           <option value="meshtastic">Meshtastic (port 4403)</option>
           <option value="meshcore">MeshCore (port 5000)</option>
@@ -252,9 +252,7 @@ function NodeEditor({ client, node, onChanged }: { client: Client; node: NodeDto
       <div className={cx("card-head")}>
         <NetworkBadge network={node.network} />
         <h2 className={cx("h")}>{node.name}</h2>
-        <span className={node.state === "connected" ? cx("ok") : node.state === "error" ? cx("warn") : cx("muted")}>
-          {node.state}
-        </span>
+        <NodeState node={node} />
         <span className={cx("muted")}>{node.detail}</span>
       </div>
       <div className={cx("row")} style={{ alignItems: "flex-end" }}>
