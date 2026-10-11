@@ -6,6 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
+| [v0.4.0](v0.4.0/io.github.alarmguypro.meshmessenger-0.4.0.zip) | main @ 205655b | Message a channel sender, tidy contacts, join/leave MeshCore channels |
 | [v0.3.1](v0.3.1/io.github.alarmguypro.meshmessenger-0.3.1.zip) | main | Fix 404 on a quiet joined channel |
 | [v0.3.0](v0.3.0/io.github.alarmguypro.meshmessenger-0.3.0.zip) | main | Searchable pickers, folders, favourites |
 | [v0.2.1](v0.2.1/io.github.alarmguypro.meshmessenger-0.2.1.zip) | main | Full contact list: warning, remove, recycle |
@@ -15,3 +16,6 @@ source tree.
 
 Install: Zeus → Features → Community → Install local feature → choose the ZIP.
 Test steps: `docs/TESTING.md` on `main`.
+
+All three catalog gates pass on v0.4.0: package validation, the security
+scan (CLEAR, 0 fail, 0 review) and the source rebuild.
