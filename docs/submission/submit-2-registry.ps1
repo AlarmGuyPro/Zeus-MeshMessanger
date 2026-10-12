@@ -105,7 +105,10 @@ Write-Host "  On branch $branch" -ForegroundColor Green
 $registryPath = Join-Path $clone 'registry.json'
 if (-not (Test-Path -LiteralPath $registryPath)) { Pop-Location; Fail 'registry.json is not in the clone.' }
 
-$registry = Get-Content -Raw -LiteralPath $registryPath
+# Normalised to LF. Git hands Windows a CRLF working copy, which would stop the
+# insertion below from finding the end of the array. Git normalises again on
+# commit, so writing LF back keeps the diff clean.
+$registry = (Get-Content -Raw -LiteralPath $registryPath) -replace "`r`n", "`n"
 if ($registry -match [regex]::Escape($FeatureId)) {
     Pop-Location
     Fail "registry.json already mentions $FeatureId. Nothing was changed — check whether this was already submitted."
