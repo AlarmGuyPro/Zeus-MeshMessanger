@@ -10,6 +10,43 @@ this repository, because the catalog's rebuild check fails on a tracked binary.
 
 ---
 
+## The short version: two scripts
+
+Everything below is explained step by step, but the two scripts in this folder
+do the mechanical parts and stop to confirm before anything is published.
+
+**Before either one, install the GitHub CLI and sign in.** This is the only
+setup, and it is needed because creating a release, forking a repository and
+pushing a branch all act as you:
+
+```powershell
+winget install --id GitHub.cli
+```
+
+Close and reopen PowerShell so the new command is found, then:
+
+```powershell
+gh auth login
+```
+
+Choose **GitHub.com**, **HTTPS**, and **Login with a web browser**.
+
+Then, pointing at the ZIP wherever you saved it:
+
+```powershell
+pwsh ./submit-1-release.ps1 -ZipPath "$HOME\Downloads\io.github.alarmguypro.meshmessenger-0.4.1.zip"
+pwsh ./submit-2-registry.ps1
+```
+
+The first checks the archive's hash and refuses to publish the wrong file, then
+creates the release. The second forks the catalog, adds the entry, validates it,
+shows you the diff, and pushes the branch. Both ask before doing anything that
+cannot be undone, and neither opens the pull request — that last step needs the
+description and the screenshots, which are yours to paste and attach.
+
+If a script stops with a message, read it: each one says what to do rather than
+just what failed.
+
 ## Upload the exact file, do not rebuild it
 
 The hash in `REGISTRY-ENTRY.json` is over one specific archive:
