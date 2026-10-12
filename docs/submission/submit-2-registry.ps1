@@ -76,7 +76,7 @@ else {
     New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
     Push-Location $WorkDir
     Write-Host "Forking $Upstream and cloning into $clone ..."
-    gh repo fork $Upstream --clone --remote 2>&1 | Write-Host
+    gh repo fork $Upstream --clone 2>&1 | Write-Host
     if (-not (Test-Path -LiteralPath $clone)) { Fail 'The fork or clone did not complete. The message above says why.' }
     Pop-Location
     Push-Location $clone
