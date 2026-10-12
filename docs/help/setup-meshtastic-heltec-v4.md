@@ -59,7 +59,7 @@ Then set the basics in one command — the node reboots after each one, so
 chaining them saves time:
 
 ```powershell
-py -m meshtastic --port COM12 --set lora.region US --set device.role CLIENT --set-owner "KQ4WL Zeus" --set-owner-short "zeus"
+py -m meshtastic --port COM12 --set lora.region US --set device.role CLIENT --set-owner "KQ4WLR Zeus" --set-owner-short "zeus"
 ```
 
 ### Which role?

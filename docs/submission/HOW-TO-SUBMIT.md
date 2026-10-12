@@ -10,6 +10,26 @@ this repository, because the catalog's rebuild check fails on a tracked binary.
 
 ---
 
+## Upload the exact file, do not rebuild it
+
+The hash in `REGISTRY-ENTRY.json` is over one specific archive:
+
+```text
+a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc
+```
+
+Rebuilding from the same commit produces an assembly that is **semantically
+identical but not byte-identical** — 70 bytes out of 384,512 differ, in the PE
+header timestamp and the module version id — so the ZIP gets a different hash
+every time it is built. The catalog's rebuild check compares assembly metadata
+and is happy with that, but the security scan verifies the SHA-256 of the file
+it downloads before it reads a single byte, and that one has to match exactly.
+
+So: upload the archive that is already published on the `builds` branch at
+`v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip`, which is the same file
+delivered in chat. Do not run the packaging script again first. If the hash of
+what you are about to upload is not the string above, you have the wrong file.
+
 ## Step 1: Publish the intake release
 
 The catalog downloads the package from a versioned GitHub Release on your own
@@ -123,11 +143,16 @@ Push corrections to the same branch and answer each review conversation. If the
 **package bytes** have to change, that is a new version, a new tag, a new URL
 and a new hash — never an overwrite of the published release.
 
-## Before you start: one thing to confirm
+## Callsign: settled
 
-`plugin.json` records the author as **KQ4WLR**, but the Meshtastic node you set
-up is named "KQ4WL Meshtastic cf18" while the MeshCore one is "KQ4WLR Zeus".
-One of those is a typo. The author string goes into a public catalog, so it is
-worth getting right before the release is cut rather than after. If it should
-be KQ4WL, that is a one-line change in `src/MeshMessenger/plugin.json`, which
-means a rebuild, a new hash, and a bump to 0.4.2 — cheap now, awkward later.
+The author is **KQ4WLR**, which is what `plugin.json` already records, so the
+package needs no change and the SHA-256 above still stands.
+
+Worth fixing separately, on the hardware rather than in this repository: the
+Meshtastic node's owner name was set to "KQ4WL Meshtastic cf18", missing the
+final R. That name is what other stations see on the air, so it is worth
+correcting on the node itself:
+
+```powershell
+py -m meshtastic --port COM12 --set-owner "KQ4WLR Meshtastic" --set-owner-short "wlr"
+```
