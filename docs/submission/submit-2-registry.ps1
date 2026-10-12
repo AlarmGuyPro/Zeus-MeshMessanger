@@ -142,19 +142,23 @@ $entry = @"
           }
         }
       ]
-    },
+    }
 "@
 
-if ($registry -notmatch '(?m)^\s*"plugins"\s*:\s*\[\s*$') {
+# The entry goes LAST in the plugins array, not first. The catalog's custody
+# regression test reads the real registry.json and requires the first
+# channel:community entry to be a grandfathered one carrying no source object;
+# a new listing placed first fails it with "Fixture expects grandfathered
+# community versions without source". The catalog's own tooling also refers to
+# a new listing as plugins[-1].
+$tail = "`n    }`n  ]`n}"
+$at = $registry.LastIndexOf($tail)
+if ($at -lt 0) {
     Pop-Location
-    Fail 'The "plugins" array in registry.json is not laid out as expected. Add the entry by hand from REGISTRY-ENTRY.json instead.'
+    Fail 'The end of the plugins array in registry.json is not laid out as expected. Add the entry by hand from REGISTRY-ENTRY.json instead, as the last element.'
 }
-
-$updated = [regex]::Replace(
-    $registry,
-    '(?m)^(\s*"plugins"\s*:\s*\[\s*)$',
-    { param($m) $m.Groups[1].Value + "`n" + $entry.TrimEnd() },
-    1)
+$updated = $registry.Substring(0, $at) + "`n    },`n" + $entry.TrimEnd().TrimEnd(',') + "`n  ]`n}" +
+    $registry.Substring($at + $tail.Length)
 
 $stamp = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
 $updated = [regex]::Replace($updated, '"generated"\s*:\s*"[^"]*"', """generated"": ""$stamp""", 1)
