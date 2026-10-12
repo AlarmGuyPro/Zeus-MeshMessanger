@@ -184,7 +184,9 @@ if (Test-Path -LiteralPath $validator) {
 # --- show the diff and confirm ---------------------------------------------
 Write-Host ''
 git --no-pager diff --stat
-$changed = (git --no-pager diff --name-only) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+# Git writes its line-ending warnings to stderr, and PowerShell folds those into
+# the pipeline, so they have to be discarded or they look like changed files.
+$changed = @(git --no-pager diff --name-only 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
 if ($changed.Count -ne 1 -or $changed[0] -ne 'registry.json') {
     Pop-Location
     Fail "A listing pull request may change only registry.json, but these changed: $($changed -join ', ')"
