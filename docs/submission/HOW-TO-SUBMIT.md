@@ -47,7 +47,7 @@ gh release create v0.4.1 `
   artifacts/io.github.alarmguypro.meshmessenger/io.github.alarmguypro.meshmessenger-0.4.1.zip `
   --repo AlarmGuyPro/Zeus-MeshMessanger `
   --title "Mesh Messenger 0.4.1" `
-  --notes "Intake release for the Zeus community catalog. Built from 5b90ba0a321d477a6282f24900d2ab686fe6f233."
+  --notes "Intake release for the Zeus community catalog. Built from f4e26ca7cba194ae713a25d7b60d8fa653bcb391."
 ```
 
 Or in the browser: **Releases → Draft a new release**, tag `v0.4.1`, target the
@@ -68,7 +68,7 @@ a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc
 If it differs, the wrong file was attached. **Never replace bytes at a URL that
 has already been published** — cut a new version instead.
 
-The tag must point at commit `5b90ba0a321d477a6282f24900d2ab686fe6f233`, which
+The tag must point at commit `f4e26ca7cba194ae713a25d7b60d8fa653bcb391`, which
 is what the catalog will clone and rebuild.
 
 ## Step 2: Fork the catalog and branch

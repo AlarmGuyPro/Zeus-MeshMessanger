@@ -30,7 +30,7 @@ reply fails and says so, rather than silently finding another route.
 | Platforms | `any` — fully managed, no native or platform-specific files |
 | License | GPL-3.0-or-later (feature-owned `LICENSE` in the package) |
 | Source | https://github.com/AlarmGuyPro/Zeus-MeshMessanger |
-| Commit | `5b90ba0a321d477a6282f24900d2ab686fe6f233` |
+| Commit | `f4e26ca7cba194ae713a25d7b60d8fa653bcb391` |
 | Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip |
 | SHA-256 | `a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc` |
 
@@ -116,7 +116,7 @@ label beside Send advert, and the channel and contact management below it.
 ## Local checks
 
 All run from the catalog repository on Linux against the exact submitted ZIP
-and a fresh clone of commit `5b90ba0`:
+and a fresh clone of commit `f4e26ca`:
 
 | Check | Result |
 |---|---|

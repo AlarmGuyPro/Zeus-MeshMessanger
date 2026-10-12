@@ -20,7 +20,7 @@
         "sha256": "a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc",
         "source": {
           "repository": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-          "commit": "5b90ba0a321d477a6282f24900d2ab686fe6f233",
+          "commit": "f4e26ca7cba194ae713a25d7b60d8fa653bcb391",
           "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip"
         }
       }
