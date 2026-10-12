@@ -155,16 +155,38 @@ A useful tell: once the log's timestamps change from `??:??:??` to a real clock,
 the node has reached an NTP server, which means Wi-Fi *and* internet are
 working.
 
-### The most likely cause in a house with several APs
+### Check the password character by character, first
 
-**It associated with an AP on the far side of the house.** A marginal link
-produces repeated AUTH_FAIL that looks exactly like a wrong password, and band
-steering happily hands the node back to the wrong radio each time.
+202 means the AP rejected the credentials, so start with the credentials — and
+read back what is actually stored rather than what you believe you typed:
+
+```powershell
+py -m meshtastic --port COM12 --get network.wifi_psk
+```
+
+Compare it against the AP's password one character at a time. A single case
+difference is enough, and it is invisible when you are reading quickly:
+`Bark1ngD0gs` and `Bark1ngd0gs` look the same at a glance and are not the same
+password. A trailing space from a copy and paste does it too.
+
+This is the boring answer and it is usually the right one.
+
+### Then: which access point is it talking to?
+
+In a house with several APs, a marginal link to a distant one produces repeated
+AUTH_FAIL that looks exactly like a wrong password, and band steering hands the
+node back to the wrong radio each time.
 
 **Lock the node to the access point in the same room.** In UniFi that's
 `Client Devices → [the node] → Lock to AP`. Other controllers have the same
 idea under a different name. This is worth doing for every mesh node, since
 they never move.
+
+Change one of these at a time. When the node that prompted this guide finally
+joined, both had been changed — the stored password had a lowercase letter
+where we had been testing an uppercase one, *and* it had been locked to the
+near AP — so which one actually fixed it is honestly unknown. Changing them one
+at a time would have told us.
 
 ### Don't trust ping
 
