@@ -8,7 +8,7 @@ private is its key.
 | Kind | Who can read it | How to join |
 |---|---|---|
 | **Public** | Anyone | Meshtastic: the default channel. MeshCore: the Public channel. |
-| **Hashtag** (MeshCore) | Anyone who knows or guesses the name — the key is made from the name | Type the name, e.g. `#denver` |
+| **Hashtag** (MeshCore) | Anyone who knows or guesses the name — the key is made from the name | Type the name, e.g. `#denver`. Capitals matter: `#test` and `#Test` are different channels |
 | **Private** | Only people you give the key to | MeshCore: the name and its key. Meshtastic: in the Meshtastic app. |
 
 Your node has a fixed number of channel slots (Meshtastic 8, MeshCore up to
@@ -25,6 +25,12 @@ On the **Nodes** tab, under **Channels**:
 - A name starting with `#` makes its own key out of the name, so everyone who
   types `#denver` is on the same channel without exchanging anything. That is
   what makes hashtag channels open: the name *is* the key.
+- **Capitals matter.** The key is made from the name exactly as typed, so
+  `#test` and `#Test` are two different channels with two different keys, and
+  neither one can hear the other. Nearly every open channel is all lowercase.
+  Check how the name is spelled on the phone or node you want to talk to
+  before joining — a channel joined with the wrong capitalisation looks
+  perfectly healthy in Zeus and is simply empty forever.
 - Any other channel needs its key from whoever runs it. There is no way to
   work it out from the name, which is the point.
 - **Leave…** clears the slot, with a confirmation. Messages already in Zeus

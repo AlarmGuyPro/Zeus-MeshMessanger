@@ -69,6 +69,7 @@ function Channels({ client, node, onChanged }: { client: Client; node: NodeDto; 
   }
 
   const needsKey = name.trim().length > 0 && !name.trim().startsWith("#");
+  const hashtag = name.trim().startsWith("#");
   const join = async () => {
     setBusy(true);
     setNote(null);
@@ -140,10 +141,19 @@ function Channels({ client, node, onChanged }: { client: Client; node: NodeDto; 
               onChange={(e) => setSecret(e.target.value)}
             />
           </label>
+          {hashtag && name.trim() !== name.trim().toLowerCase() && (
+            <p className={`${cx("notice")} ${cx("notice--warn")}`} role="status">
+              <strong>Capitals matter here.</strong> The key comes from the name exactly as typed, so{" "}
+              <span className={cx("mono")}>{name.trim()}</span> and{" "}
+              <span className={cx("mono")}>{name.trim().toLowerCase()}</span> are two different channels that cannot
+              hear each other. Nearly every open channel is all lowercase — check how the name is spelled on the phone
+              or node you want to talk to before joining.
+            </p>
+          )}
           <p className={cx("help")}>
-            A name starting with <strong>#</strong> makes its own key from the name, so everyone who types the same
-            name is on the same channel — that is how open local channels work. Any other channel needs its key, which
-            whoever runs it has to give you.
+            A name starting with <strong>#</strong> makes its own key from the name, so everyone who types it{" "}
+            <strong>exactly</strong> the same way — capitals and all — is on the same channel. That is how open local
+            channels work. Any other channel needs its key, which whoever runs it has to give you.
           </p>
           <div className={cx("row")}>
             <button
