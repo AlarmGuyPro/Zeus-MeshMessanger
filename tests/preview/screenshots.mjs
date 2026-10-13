@@ -38,9 +38,16 @@ async function shoot(page, name) {
   process.stdout.write(`  ${file}\n`);
 }
 
-/** Opens a tab by its label and waits for the pane to settle. */
-async function tab(page, label) {
+/**
+ * Opens a tab by its label and waits for the pane to settle. With `expect`, waits for that
+ * text to appear rather than for a guess at how long the data takes — a fixed delay
+ * photographed a half-loaded Nodes tab more than once.
+ */
+async function tab(page, label, expect) {
   await page.getByRole("tab", { name: label }).click();
+  if (expect) {
+    await page.locator(`text=${expect}`).first().waitFor({ timeout: 20000 }).catch(() => {});
+  }
   await page.waitForTimeout(700);
 }
 
@@ -71,13 +78,13 @@ try {
   await page.waitForTimeout(2500);
 
   // --- the four tabs, dark, normal width
-  for (const [label, name] of [
+  for (const [label, name, expect] of [
     ["Inbox", "inbox-dark"],
-    ["Nodes", "nodes-dark"],
+    ["Nodes", "nodes-dark", "Tidy the list"],
     ["Logs", "logs-dark"],
     ["Settings", "settings-dark"],
   ]) {
-    await tab(page, label);
+    await tab(page, label, expect);
     await shoot(page, name);
   }
 
@@ -99,13 +106,13 @@ try {
 
   // --- light
   await theme(page, "light");
-  for (const [label, name] of [
+  for (const [label, name, expect] of [
     ["Inbox", "inbox-light"],
     ["Nodes", "nodes-light"],
     ["Logs", "logs-light"],
     ["Settings", "settings-light"],
   ]) {
-    await tab(page, label);
+    await tab(page, label, expect);
     await shoot(page, name);
   }
   await theme(page, "dark");
@@ -119,12 +126,12 @@ try {
   // --- narrow
   await page.setViewportSize(NARROW);
   await page.waitForTimeout(300);
-  for (const [label, name] of [
+  for (const [label, name, expect] of [
     ["Inbox", "inbox-narrow"],
     ["Nodes", "nodes-narrow"],
     ["Logs", "logs-narrow"],
   ]) {
-    await tab(page, label);
+    await tab(page, label, expect);
     await shoot(page, name);
   }
   await page.setViewportSize(NORMAL);
@@ -136,7 +143,7 @@ try {
   await bigPage.waitForFunction(() => window.__previewReady === true, { timeout: 15000 });
   await bigPage.evaluate(() => (document.documentElement.style.fontSize = "26px"));
   await bigPage.waitForTimeout(2500);
-  for (const [label, name] of [
+  for (const [label, name, expect] of [
     ["Inbox", "inbox-200pc"],
     ["Nodes", "nodes-200pc"],
   ]) {
@@ -189,12 +196,12 @@ try {
     );
   }
   await page.waitForTimeout(1500);
-  for (const [label, name] of [
+  for (const [label, name, expect] of [
     ["Inbox", "empty-inbox"],
     ["Nodes", "empty-nodes"],
     ["Logs", "empty-logs"],
   ]) {
-    await tab(page, label);
+    await tab(page, label, expect);
     await shoot(page, name);
   }
 

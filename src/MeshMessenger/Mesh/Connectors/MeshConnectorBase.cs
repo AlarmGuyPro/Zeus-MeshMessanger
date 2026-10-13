@@ -170,6 +170,8 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     public virtual int RememberedPeerLimit => int.MaxValue;
 
+    public virtual int PeersSavedByTheNode => 0;
+
     public virtual bool? RecycleOldestWhenFull => null;
 
     public virtual Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) =>

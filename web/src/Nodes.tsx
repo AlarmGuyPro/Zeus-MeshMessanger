@@ -247,6 +247,9 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
     });
   }, [all, needle, showRepeaters]);
   const heardOnly = all.filter((p) => !p.savedOnNode).length;
+  // Watched behaviour, not a setting Zeus read: the node pushes a different code for a
+  // station it saved than for one it merely heard.
+  const selfAdding = (node?.peersSavedByTheNode ?? 0) > 0;
   const repeaters = all.filter((p) => p.kind === "repeater").length;
 
   if (!node) return null;
@@ -323,7 +326,12 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
       const result = await client.cleanupPeers(node.id, cleanup.what, false);
       setNote(
         result.ok
-          ? { kind: "ok", text: `Removed ${result.count} contact${result.count === 1 ? "" : "s"} from the node.` }
+          ? {
+              kind: "ok",
+              text:
+                `Removed ${result.count} contact${result.count === 1 ? "" : "s"} from the node.` +
+                (selfAdding ? " The node adds stations by itself, so expect some of them back." : ""),
+            }
           : {
               kind: "warn",
               // A partial result is the common case when a node gets behind, so say how far
@@ -438,8 +446,14 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
 
         {heardOnly > 0 && (
           <p className={cx("help")}>
-            {heardOnly} station{heardOnly === 1 ? " was" : "s were"} heard but not saved as contacts, because the node is
-            set to add contacts manually. Zeus saves one automatically the first time you message it.
+            {heardOnly} station{heardOnly === 1 ? " was" : "s were"} heard but not saved as contacts.{" "}
+            {/* Only the node knows why. Saying "it is set to add manually" was a guess, and a
+                wrong one on a node that is plainly adding stations by itself — it may simply
+                have been out of room or beyond its hop limit. */}
+            {selfAdding
+              ? "This node does add stations by itself, so these were probably beyond its hop limit or arrived with no room left."
+              : "That is the node's own setting — it adds contacts only when asked."}{" "}
+            Zeus saves one automatically the first time you message it.
           </p>
         )}
 
@@ -476,6 +490,16 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         )}
 
         <Channels client={client} node={node} onChanged={onChanged} />
+
+        {selfAdding && (
+          <p className={cx("notice")} role="status">
+            <strong>This node adds stations by itself.</strong> It has saved {node.peersSavedByTheNode} station
+            {node.peersSavedByTheNode === 1 ? "" : "s"} since Zeus connected, without being asked — that is the node's
+            own setting, not Zeus. So its list fills up on its own, and anything you remove here comes back as it hears
+            it again. To stop that, turn off automatic adding (or lower its hop limit) in the MeshCore app. Leaving
+            recycling on, below, means a full list never blocks a new station either way.
+          </p>
+        )}
 
         {hasCapacity && all.length > 0 && (
           <>
@@ -522,7 +546,8 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
               <div className={cx("thread-tools")}>
                 <span className={cx("warn")}>
                   Remove {cleanup.count} contact{cleanup.count === 1 ? "" : "s"} from {node.name}?
-                  {cleanup.count >= 50 && " That takes a minute or two — the node is removed one contact at a time so it keeps up. Leave Zeus open; the count updates as it goes."}
+                  {cleanup.count >= 50 && " That takes a minute or two — they go one at a time so the node keeps up. Leave Zeus open; the count updates as it goes."}
+                  {selfAdding && " This node saves stations by itself, so they will come back as it hears them again unless you turn that off in the MeshCore app first."}
                 </span>
                 <button
                   type="button"

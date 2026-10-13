@@ -45,6 +45,8 @@ export interface NodeDto {
   canAnnounce?: boolean;
   /** True when channels can be joined and left on this node from Zeus. */
   canEditChannels: boolean;
+  /** Stations the node has added to its own contact list, unprompted, since Zeus connected. */
+  peersSavedByTheNode?: number;
   pendingMove?: string;
   self?: SelfDto;
   maxDirectTextBytes: number;

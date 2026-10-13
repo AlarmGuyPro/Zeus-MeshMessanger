@@ -336,9 +336,16 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 lock (_gate)
                 {
                     var known = _contacts.TryGetValue(key, out var c);
+                    if (!known)
+                    {
+                        // Watched, not inferred: the node decided to save a station on its
+                        // own. Counting these is how Zeus can tell an operator why their
+                        // contact list refills itself, without guessing at firmware settings.
+                        _savedByTheNode++;
+                    }
                     Log(LogLevel.Receive, known
                         ? $"Heard an advert from \"{c!.Name}\" ({Short(key)}); its contact was updated."
-                        : $"Heard an advert from {Short(key)}; the node saved it as a new contact.");
+                        : $"Heard an advert from {Short(key)}; the node saved it as a new contact by itself.");
                 }
                 _ = RefreshContactsSoonAsync();
                 break;
@@ -369,6 +376,16 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         PushPathDiscoveryResponse => "a path discovery reply",
         _ => $"push code 0x{code:x2}",
     };
+
+    private int _savedByTheNode;
+
+    /// <summary>
+    /// Stations the node has saved on its own initiative since Zeus connected. This is
+    /// observed rather than read from a setting: the firmware pushes a different code for a
+    /// station it saved than for one it only heard, so counting them says what the node is
+    /// actually doing without relying on any reading of its configuration.
+    /// </summary>
+    public override int PeersSavedByTheNode => Volatile.Read(ref _savedByTheNode);
 
     private int _refreshQueued;
 

@@ -61,6 +61,13 @@ public interface IMeshConnector : IAsyncDisposable
     /// </summary>
     int RememberedPeerLimit { get; }
 
+    /// <summary>
+    /// How many stations the node has added to its own contact list, unprompted, since Zeus
+    /// connected. Anything above zero means its list grows on its own, so contacts removed
+    /// from it come back — which is otherwise a mystery to whoever removed them.
+    /// </summary>
+    int PeersSavedByTheNode { get; }
+
     /// <summary>Whether the node recycles its oldest contact when the list is full; null when the node has no such setting.</summary>
     bool? RecycleOldestWhenFull { get; }
 

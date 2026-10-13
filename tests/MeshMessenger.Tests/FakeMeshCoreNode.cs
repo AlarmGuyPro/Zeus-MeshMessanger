@@ -134,6 +134,21 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
         return key;
     }
 
+    /// <summary>
+    /// Advert from a station this node saves on its own, as a node with auto-add on does:
+    /// the contact appears in its list and the client is told with PUSH_ADVERT, not
+    /// PUSH_NEW_ADVERT.
+    /// </summary>
+    public async Task<byte[]> AdvertiseSavedAsync(string name, int type = 2)
+    {
+        var key = AddContact(name, type);
+        var f = new byte[33];
+        f[0] = PushAdvert;
+        key.CopyTo(f, 1);
+        if (_client is not null) await WriteAsync(_client, f);
+        return key;
+    }
+
     private async Task TickleAsync()
     {
         if (_client is not null) await WriteAsync(_client, [PushMsgWaiting]);

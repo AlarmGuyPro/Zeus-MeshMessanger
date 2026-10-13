@@ -72,6 +72,22 @@ and nodes that hear it list it. So:
 - **Re-read from node** re-reads the list from the node, which helps after
   adding a contact in the phone app.
 
+## Contacts I removed have come back
+
+Most MeshCore nodes are set to add every station they hear, by themselves. On a busy mesh
+that is hundreds of repeaters, arriving all day, so a list cleared with **Tidy the list**
+refills within minutes and looks as though the removal never worked.
+
+The Nodes tab says so when it is happening: **"This node adds stations by itself"**, with
+a count of how many it has saved since Zeus connected. That is not something Zeus read from
+a setting — it is counted from the node announcing each one, so when it says this, it is
+what the node is doing.
+
+Zeus cannot change it. Turn automatic adding off in the MeshCore app, or lower its hop
+limit so it only saves stations near you, and then one tidy-up will stick. If you would
+rather leave it adding everything, turn on **Recycle the oldest contact when the list is
+full** and a full list stops mattering.
+
 ## The contact list is full
 
 A MeshCore node holds a fixed number of contacts (350 in the build from the

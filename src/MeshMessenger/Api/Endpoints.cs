@@ -18,7 +18,8 @@ public sealed record NodeDto(
     string Id, string Network, string Name, string Host, int Port, bool Enabled, string State, string? Detail,
     string? Identity, bool FindIfAddressChanges, string? PendingMove, SelfDto? Self,
     int MaxDirectTextBytes, int MaxChannelTextBytes, IReadOnlyList<ChannelDto> Channels, int PeerCount,
-    int? PeerCapacity, bool? RecycleOldestWhenFull, bool CanAnnounce, bool CanEditChannels);
+    int? PeerCapacity, bool? RecycleOldestWhenFull, bool CanAnnounce, bool CanEditChannels,
+    int PeersSavedByTheNode = 0);
 
 public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<string> ScanRanges, int HistoryPerConversation,
     long Version, string PluginVersion = "");
@@ -446,7 +447,8 @@ internal static class Endpoints
         c.Self is null ? null : new SelfDto(c.Self.Identity, c.Self.Name, c.Self.ShortName, c.Self.Firmware, c.Self.Model, c.Self.RadioSummary),
         c.MaxTextBytes(ConversationKind.Direct), c.MaxTextBytes(ConversationKind.Channel),
         c.Channels.Select(ch => new ChannelDto(ch.Index, ch.Name, Lower(ch.Kind), ch.Primary)).ToArray(),
-        c.Peers.Count, c.PeerCapacity, c.RecycleOldestWhenFull, c.CanAnnounce, c.CanEditChannels);
+        c.Peers.Count, c.PeerCapacity, c.RecycleOldestWhenFull, c.CanAnnounce, c.CanEditChannels,
+        c.PeersSavedByTheNode);
 
     private static PeerDto PeerToDto(PeerInfo p) => new(
         p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode, p.LastUpdated);

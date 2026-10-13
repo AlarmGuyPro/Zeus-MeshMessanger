@@ -95,10 +95,24 @@ public static class Preview
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/api/plugins/{id}/") };
         await http.PostAsJsonAsync("nodes", new { network = "meshcore", host = $"127.0.0.1:{meshcore.Port}", name = "KQ4WLR Zeus" });
         await http.PostAsJsonAsync("nodes", new { network = "meshtastic", host = $"127.0.0.1:{meshtastic.Port}", name = "KQ4WLR Meshtastic" });
-        await Task.Delay(1500);
+        // Wait until both are actually connected: traffic sent before the connector attaches
+        // goes nowhere, and a preview that silently has no contacts is worse than no preview.
+        for (var i = 0; i < 60; i++)
+        {
+            var status = await http.GetFromJsonAsync<System.Text.Json.Nodes.JsonNode>("status");
+            var connected = status?["nodes"]?.AsArray()
+                .Count(n => n?["state"]?.GetValue<string>() == "connected") ?? 0;
+            if (connected >= 2) break;
+            await Task.Delay(250);
+        }
         await meshcore.HearChannelAsync(0, "W0QQ Base", "morning all, nets at 0900");
         await meshcore.HearChannelAsync(1, "KE0XYZ Mobile", "anyone on #Test?");
         await meshtastic.HearTextAsync(0x77e0a913, 0xFFFFFFFF, 0, "repeater is back up");
+        // A node with auto-add on, as a node on a busy mesh usually is: it saves repeaters
+        // it hears without being asked, which is what the Nodes tab now explains.
+        await meshcore.AdvertiseSavedAsync("Tower Repeater");
+        await meshcore.AdvertiseSavedAsync("Hilltop Repeater");
+        await meshcore.HearUnsavedAdvertAsync("KQ4WLR Wio L1");
         Console.WriteLine("Ready. Ctrl-C to stop.");
 
         var stop = new TaskCompletionSource();

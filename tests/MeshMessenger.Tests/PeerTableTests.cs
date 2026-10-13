@@ -140,3 +140,33 @@ public static class BulkRemovalTests
         Assert.Equal(ConnectorState.Connected, c.State, "still connected");
     }
 }
+
+/// <summary>
+/// Telling the operator what the node is doing on its own. A node that auto-adds every
+/// station it hears refills its contact list continuously, so repeaters removed from it come
+/// straight back — which looks exactly like Zeus failing to remove them.
+/// </summary>
+public static class SelfAddingNodeTests
+{
+    [Test(Loopback = true)]
+    public static async Task ZeusCountsTheStationsTheNodeSavesWithoutBeingAsked()
+    {
+        await using var node = new FakeMeshCoreNode();
+        await using var c = new MeshCoreConnector(
+            new NodeConfig { Id = "mc", Network = MeshNetwork.MeshCore, Host = "127.0.0.1", Port = node.Port },
+            new ConnectorOptions { MinBackoff = TimeSpan.FromMilliseconds(100), ConnectTimeout = TimeSpan.FromSeconds(2) });
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        Assert.Equal(0, c.PeersSavedByTheNode, "nothing saved yet");
+
+        // A station the node merely heard and did not save is not the node adding anything.
+        await node.HearUnsavedAdvertAsync("KQ4WLR Wio L1");
+        await Assert.Eventually(() => c.Peers.Any(p => !p.SavedOnNode), "heard station listed");
+        Assert.Equal(0, c.PeersSavedByTheNode, "hearing is not saving");
+
+        // A station the node saved by itself is.
+        await node.AdvertiseSavedAsync("Tower Repeater");
+        await node.AdvertiseSavedAsync("Hilltop Repeater");
+        await Assert.Eventually(() => c.PeersSavedByTheNode == 2, "both counted");
+    }
+}
