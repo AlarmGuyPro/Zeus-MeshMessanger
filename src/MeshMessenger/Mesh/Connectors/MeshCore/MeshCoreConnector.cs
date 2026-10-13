@@ -212,7 +212,10 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             }
             catch (Exception ex) when (ex is FormatException or ArgumentOutOfRangeException or IndexOutOfRangeException)
             {
-                // A malformed frame must never end the session or reach Zeus.
+                // A malformed frame must never end the session or reach Zeus, but it
+                // should not vanish without trace either.
+                Log(LogLevel.Warning,
+                    $"A frame from the node couldn't be read (code {(frame.Length > 0 ? frame[0] : 0)}, {frame.Length} bytes): {ex.GetType().Name}.");
             }
         }
     }
@@ -239,6 +242,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         switch (f[0])
         {
             case PushMsgWaiting:
+                Log(LogLevel.Info, "The node says a message is waiting; fetching it.");
                 Interlocked.Exchange(ref _syncRequested, 1);
                 try { _wake.Release(); } catch (SemaphoreFullException) { }
                 break;
@@ -293,6 +297,9 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             case PushPathUpdated or PushContactDeleted:
                 // Contact details changed; refresh on the next quiet moment.
                 _ = RefreshContactsSoonAsync();
+                break;
+            default:
+                Log(LogLevel.Info, $"The node sent push code 0x{f[0]:x2} ({f.Length} bytes), which Zeus doesn't use.");
                 break;
         }
     }
@@ -402,7 +409,15 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 ct).ConfigureAwait(false);
             if (f[0] == RespNoMoreMessages) return;
             var received = ParseReceived(f);
-            if (received is not null) Deliver(received, queuedWhileAway);
+            if (received is null)
+            {
+                // Something the node called a message and Zeus could not read. Silence here
+                // used to look exactly like no message ever arriving.
+                Log(LogLevel.Warning,
+                    $"The node handed Zeus a message frame it couldn't read (code {f[0]}, {f.Length} bytes), so it was dropped.");
+                continue;
+            }
+            Deliver(received, queuedWhileAway);
         }
     }
 
@@ -411,6 +426,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         var sent = PlausibleTime(r.Timestamp);
         var hops = HopsFromPathLength(r.PathLength);
         var reception = new Reception(r.Snr, null, hops, hops is null, false);
+        LogArrival(r, queuedWhileAway);
         // Packet identity for de-duplication: sender + their timestamp + text.
         var networkId = $"{Convert.ToHexString(r.SenderPrefix)}:{r.ChannelIndex}:{r.Timestamp}:{r.Text.GetHashCode(StringComparison.Ordinal):x8}";
         if (r.IsChannel)
@@ -444,6 +460,42 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             peer, contact?.Name, r.Text, sent, networkId, reception, queuedWhileAway));
     }
 
+    /// <summary>
+    /// Says that a message arrived, and on which channel or from which station, without
+    /// recording what it said. Written because the only way to tell "the node never
+    /// decrypted it" from "Zeus received it and filed it somewhere unexpected" is to see
+    /// the arrival in the log.
+    /// </summary>
+    private void LogArrival(ReceivedText r, bool queuedWhileAway)
+    {
+        var bytes = Encoding.UTF8.GetByteCount(r.Text);
+        var how = queuedWhileAway ? ", queued while Zeus was away" : "";
+        var signal = r.Snr is null ? "" : $", SNR {r.Snr:0.#} dB";
+        var hops = HopsFromPathLength(r.PathLength);
+        var route = hops is null ? ", direct route" : hops == 0 ? ", no hops" : $", {hops} hop{(hops == 1 ? "" : "s")}";
+        if (!r.IsChannel)
+        {
+            var kind = r.TextType == TxtSignedPlain ? "A room post" : "A direct message";
+            Log(LogLevel.Receive, $"{kind} from {Short(Convert.ToHexString(r.SenderPrefix))}: {bytes} bytes{signal}{route}{how}.");
+            return;
+        }
+        string? name;
+        lock (_gate)
+        {
+            var slot = _slots.FirstOrDefault(s => s.Index == r.ChannelIndex);
+            name = slot is null || slot.IsEmpty ? null : slot.Name;
+        }
+        if (name is null)
+        {
+            Log(LogLevel.Warning,
+                $"A channel message arrived on slot {r.ChannelIndex}, which has no channel configured on the node: " +
+                $"{bytes} bytes{signal}{route}{how}. Zeus can't name this conversation.");
+            return;
+        }
+        Log(LogLevel.Receive,
+            $"Channel {r.ChannelIndex} (\"{name}\"): received {bytes} bytes{signal}{route}{how}.");
+    }
+
     private DateTimeOffset PlausibleTime(uint senderTimestamp)
     {
         var now = Options.Time.GetUtcNow();
@@ -473,7 +525,23 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 case ConversationKind.Channel:
                 {
                     if (!int.TryParse(to.Peer, out var index)) return SendResult.Failure("Unknown channel.");
-                    Log(LogLevel.Send, $"Channel {index}: sending {Encoding.UTF8.GetByteCount(text)} bytes.");
+                    // An index with no channel behind it must never transmit: the firmware
+                    // takes the low byte of whatever it is handed, so an out-of-range slot
+                    // would go out on the public channel for everyone to read.
+                    string? channelName;
+                    lock (_gate)
+                    {
+                        var slot = _slots.FirstOrDefault(s => s.Index == index);
+                        channelName = slot is null || slot.IsEmpty ? null : (slot.Name.Length > 0 ? slot.Name : $"Channel {index}");
+                    }
+                    if (channelName is null)
+                    {
+                        Log(LogLevel.Warning, $"Refused to send on channel slot {index}: the node has no channel there.");
+                        return SendResult.Failure(
+                            $"{DisplayName} has no channel in slot {index}, so nothing was transmitted. " +
+                            "Check the channel list on the Nodes tab.");
+                    }
+                    Log(LogLevel.Send, $"Channel {index} (\"{channelName}\"): sending {Encoding.UTF8.GetByteCount(text)} bytes.");
                     await CommandAsync(SendChannel(index, ts, text), c => c is RespOk, ct).ConfigureAwait(false);
                     Log(LogLevel.Send, $"Channel {index}: the node accepted it (channels are not acknowledged).");
                     // Channels have no acknowledgement in MeshCore; "Sent" is final.

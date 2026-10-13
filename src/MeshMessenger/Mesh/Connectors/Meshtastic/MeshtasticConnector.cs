@@ -298,13 +298,31 @@ public sealed class MeshtasticConnector : MeshConnectorBase
         }
         else
         {
-            return; // addressed to someone else
+            // A direct message between two other stations that this node happened to hear.
+            Log(LogLevel.Info, $"Heard a message from {NodeId(p.From)} addressed to {NodeId(p.To)}, so Zeus left it alone.");
+            return;
         }
         string? name;
-        lock (_gate) name = _nodes.TryGetValue(p.From, out var n) ? n.User?.LongName ?? n.User?.ShortName : null;
+        string? channelName;
+        lock (_gate)
+        {
+            name = _nodes.TryGetValue(p.From, out var n) ? n.User?.LongName ?? n.User?.ShortName : null;
+            channelName = _channels.TryGetValue(p.Channel, out var c) && c.Role != 0 ? ChannelName(c) : null;
+        }
         var sent = p.RxTime is { } rx && rx <= now.AddMinutes(5) && rx >= now.AddDays(-7) ? rx : now;
         var queued = sent < _sessionStart.AddSeconds(-10);
         var reception = new Reception(p.RxSnr, p.RxRssi, hops, hops == 0, p.ViaMqtt);
+        // The arrival is logged, never the text: without this, a message that the node
+        // received but Zeus filed somewhere unexpected is indistinguishable from one
+        // that never arrived at all.
+        var where = p.To == Broadcast
+            ? $"Channel {p.Channel}{(channelName is { } cn ? $" (\"{cn}\")" : "")}"
+            : $"A direct message from {name ?? NodeId(p.From)}";
+        Log(LogLevel.Receive,
+            $"{where}: received {Encoding.UTF8.GetByteCount(text)} bytes" +
+            $"{(p.RxSnr is { } s ? $", SNR {s:0.#} dB" : "")}" +
+            $"{(hops is null ? "" : hops == 0 ? ", no hops" : $", {hops} hop{(hops == 1 ? "" : "s")}")}" +
+            $"{(p.ViaMqtt ? ", via MQTT" : "")}{(queued ? ", queued while Zeus was away" : "")}.");
         PublishInbound(new InboundMessage(key, NodeId(p.From), name, text, sent, $"{p.From:x8}:{p.Id:x8}", reception, queued));
     }
 

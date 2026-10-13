@@ -168,6 +168,27 @@ public static class ConnectorTests
     }
 
     [Test]
+    public static async Task MeshCoreNeverTransmitsOnAChannelSlotTheNodeDoesNotHave()
+    {
+        // The firmware takes the low byte of the slot index it is handed, so an index with
+        // no channel behind it used to go out on the public channel for everyone to read.
+        await using var node = new FakeMeshCoreNode();
+        await using var c = new MeshCoreConnector(Config("mc", MeshNetwork.MeshCore, node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        var before = node.Received.Count(r => r[0] == MeshCoreProtocol.CmdSendChannelTxtMsg);
+
+        foreach (var slot in new[] { "7", "256", "-1" })
+        {
+            var result = await c.SendAsync(new ConversationKey("mc", ConversationKind.Channel, slot), "hello", default);
+            Assert.False(result.Ok, $"slot {slot} refused");
+            Assert.Contains("no channel", result.Error ?? "", $"slot {slot} says why");
+        }
+        Assert.Equal(before, node.Received.Count(r => r[0] == MeshCoreProtocol.CmdSendChannelTxtMsg),
+            "nothing was transmitted");
+    }
+
+    [Test]
     public static async Task MeshCoreSavesAHeardStationBeforeTheFirstDirectMessage()
     {
         // Real-hardware finding: with manual-add on, the node pushes NEW_ADVERT but doesn't
