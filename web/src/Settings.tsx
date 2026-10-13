@@ -32,7 +32,9 @@ function AddNode({ client, status, onChanged }: { client: Client; status: Status
 
   const scan = discovery.kind === "ready" ? discovery.data.scan : null;
   const running = !!scan?.running;
-  useEffect(() => setPoll(running ? 700 : 4000), [running]);
+  useEffect(() => {
+    setPoll(running ? 700 : 4000);
+  }, [running]);
 
   const start = async () => {
     setError(null);
@@ -233,7 +235,9 @@ function NodeEditor({ client, node, onChanged }: { client: Client; node: NodeDto
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
-  useEffect(() => setHost(node.host), [node.host]);
+  useEffect(() => {
+    setHost(node.host);
+  }, [node.host]);
 
   const run = async (action: () => Promise<unknown>) => {
     setError(null);

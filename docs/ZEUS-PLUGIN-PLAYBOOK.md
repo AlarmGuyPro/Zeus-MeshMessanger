@@ -276,3 +276,36 @@ signalled by border colour alone.
 
 Keep its dependencies outside the directory the catalog rebuilds, and keep its
 output out of git — a tracked binary fails the rebuild check.
+
+## 13. An effect must never return an expression
+
+The worst bug of the project, and it is three characters wide:
+
+```tsx
+useEffect(() => el?.scrollTo({ top: 0 }), [id]);   // wrong
+useEffect(() => { el?.scrollTo({ top: 0 }); }, [id]);  // right
+```
+
+React keeps whatever an effect returns and calls it later as the cleanup. `scrollTo` returns
+undefined by specification, so the first line is harmless in a browser — and in the host's
+webview, which ships a chainable scroll polyfill, it returns the element. React then called a
+`<div>` and threw `d is not a function` from inside its own minified code, which took down
+the whole Zeus workspace, not just the feature's panel.
+
+Two lessons beyond the one line:
+
+**Give every panel an error boundary, on day one.** A feature renders inside its host's React
+tree, so an exception during render unmounts whatever tree it reaches. Without a boundary a
+bug in a feature does not produce a broken panel, it takes the window — and the operator
+loses their workspace to a feature they were only looking at. With one, they get a message,
+a Try again, and a Copy the details button that hands over the stack. That button turned a
+three-hour hunt into a four-minute fix.
+
+**The browser you develop in is not the browser you ship in.** This reproduced on the bench
+every time and in a plain Chromium never, because plain Chromium follows the specification.
+The preview harness now renders under simulated host quirks
+(`tests/preview/regression.mjs`), and that file is the right home for every future one.
+
+And a process note: trust the operator's description over your own reproduction. The report
+was "clicking a channel crashes Zeus", which was exact. Two rounds were spent doubting it
+because the logs showed a tidy restart and the panel was clean under test.

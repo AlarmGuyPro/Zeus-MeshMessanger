@@ -83,5 +83,17 @@ loading and error screenshots, and it deletes every node at the end for the
 empty ones. Its dependencies sit outside `web/` on purpose, so they are not part
 of the build the catalog rebuilds and scans.
 
+### Host quirks
+
+```powershell
+node tests/preview/regression.mjs --port 5319
+```
+
+Renders the panel under differences between a plain browser and an embedded webview, and
+fails if the error boundary ever appears. Run it before a release: the browser the panel is
+developed in is not the browser it ships in, and the one fault this caught — an effect
+returning the value of `scrollTo`, which is undefined in Chromium and the element in Zeus —
+was invisible everywhere except on a live bench.
+
 Screenshots are never committed: the catalog's rebuild check fails on a tracked
 binary. Deliver them as a ZIP.

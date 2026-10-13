@@ -50,7 +50,11 @@ export function Picker(props: {
   const needle = query.trim().toLowerCase();
   const shown = useMemo(() => options.filter((o) => matches(o, needle)), [options, needle]);
 
-  useEffect(() => setActive(0), [needle, open]);
+  // Braces: an effect must return a cleanup function or nothing at all, never
+  // whatever the expression inside it happens to evaluate to.
+  useEffect(() => {
+    setActive(0);
+  }, [needle, open]);
 
   useEffect(() => {
     if (!open) return;

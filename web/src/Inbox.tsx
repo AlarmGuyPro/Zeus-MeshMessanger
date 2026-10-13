@@ -319,7 +319,16 @@ function Thread(props: {
   // Newest is at the top, so "show me what just happened" means the top of the list.
   // Opening a conversation and sending both go there; an arrival while the operator is
   // reading older traffic deliberately leaves the scroll alone.
-  const toNewest = () => thread.current?.scrollTo({ top: 0 });
+  //
+  // The braces are load-bearing. React keeps whatever an effect RETURNS and calls it later
+  // as the cleanup, so `() => el?.scrollTo(...)` hands React the return value of scrollTo.
+  // That is undefined per the specification and in a plain browser, but a host whose webview
+  // ships a chainable scroll polyfill returns the element — React then calls the element on
+  // the next conversation change and throws "d is not a function" from inside its own
+  // minified code, which is exactly how this was found, on a bench and not here.
+  const toNewest = () => {
+    thread.current?.scrollTo({ top: 0 });
+  };
   useEffect(toNewest, [conversation.id]);
 
   const bytes = utf8Length(draft.trim());
