@@ -43,6 +43,15 @@ case-sensitive, and a `#name` channel's key is derived from the name exactly as
 typed, so `#test` and `#Test` are two different channels that cannot hear each
 other.
 
+## The panel shows "Mesh Messenger couldn't draw this panel"
+
+A fault inside the feature, caught before it could reach the rest of Zeus. Your nodes keep
+running and collecting messages while it is showing, and **Try again** usually clears it.
+
+**Copy the details** puts the error and the exact place it happened on the clipboard. That
+is the single most useful thing to put in a bug report for this kind of fault — far more so
+than a description of what you clicked.
+
 ## A message says it wasn't sent
 
 The reason is shown under the message, and **Send again** retries it. Common

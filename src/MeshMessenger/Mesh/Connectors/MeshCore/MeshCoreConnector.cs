@@ -1006,7 +1006,10 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 await CommandAsync(SetOtherParams(nextManual), c => c is RespOk, ct).ConfigureAwait(false);
                 lock (_gate) _manualAddContacts = nextManual;
             }
-            Log(LogLevel.Info, Describe(AutoAdd!));
+            // Not AutoAdd!: a reconnect between the check above and here can clear the
+            // cached config, and a null-forgiving operator there would throw out of an
+            // endpoint for no reason. Describe what was asked for instead.
+            Log(LogLevel.Info, Describe(policy));
             RaiseChanged();
             return null;
         }
