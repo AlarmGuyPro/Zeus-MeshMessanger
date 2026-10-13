@@ -74,3 +74,69 @@ public static class PeerTableTests
         Assert.Equal(MeshtasticConnector.MaxKnownNodes, c.RememberedPeerLimit, "the limit is reported");
     }
 }
+
+/// <summary>
+/// Clearing a long contact list. Found on real hardware: removing 323 repeaters one call at
+/// a time re-read the whole contact list after every single removal, which buried the node
+/// in frames until it stopped answering, and the first unanswered keep-alive check tore the
+/// session down — so the node appeared to vanish part-way through.
+/// </summary>
+public static class BulkRemovalTests
+{
+    private static ConnectorOptions Fast => new()
+    {
+        MinBackoff = TimeSpan.FromMilliseconds(100),
+        ConnectTimeout = TimeSpan.FromSeconds(2),
+    };
+
+    private static NodeConfig Config(int port) =>
+        new() { Id = "mc", Network = MeshNetwork.MeshCore, Host = "127.0.0.1", Port = port };
+
+    [Test(Loopback = true)]
+    public static async Task ClearingALongContactListReadsItBackOnceAndKeepsTheNode()
+    {
+        await using var node = new FakeMeshCoreNode();
+        for (var i = 0; i < 120; i++) node.AddContact($"Repeater {i:000}", type: 2);
+        node.AddContact("KE0XYZ Mobile");
+
+        await using var c = new MeshCoreConnector(Config(node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        await Assert.Eventually(() => c.Peers.Count(p => p.SavedOnNode) == 121, "contacts read");
+
+        var readsBefore = node.ContactListReads;
+        var repeaters = c.Peers.Where(p => p.Kind == PeerKind.Repeater).Select(p => p.Id).ToList();
+        Assert.Equal(120, repeaters.Count, "repeaters to remove");
+
+        var result = await c.RemovePeersAsync(repeaters, default);
+
+        Assert.Equal(120, result.Removed, "all removed");
+        Assert.True(result.Complete, result.Error ?? "complete");
+        Assert.Equal(1, node.ContactListReads - readsBefore,
+            "the contact list is read back once, not once per contact");
+        Assert.Equal(ConnectorState.Connected, c.State, "the node did not go missing");
+        Assert.Equal(1, c.Peers.Count(p => p.SavedOnNode), "only the station that was kept");
+        Assert.True(c.Peers.Any(p => p.Name == "KE0XYZ Mobile"), "and it is the right one");
+    }
+
+    [Test(Loopback = true)]
+    public static async Task ANodeThatStopsAnsweringMidClearSaysHowFarItGotAndStaysConnected()
+    {
+        await using var node = new FakeMeshCoreNode();
+        for (var i = 0; i < 40; i++) node.AddContact($"Repeater {i:000}", type: 2);
+        node.StallAfterRemovals = 12;
+
+        await using var c = new MeshCoreConnector(Config(node.Port), Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        await Assert.Eventually(() => c.Peers.Count(p => p.SavedOnNode) == 40, "contacts read");
+
+        var result = await c.RemovePeersAsync(c.Peers.Select(p => p.Id).ToList(), default);
+
+        Assert.Equal(12, result.Removed, "stopped where the node did");
+        Assert.False(result.Complete, "and says it did not finish");
+        Assert.Contains("12 of 40", result.Error ?? "", "says how far it got");
+        // The important part: one unanswered command is not a lost node.
+        Assert.Equal(ConnectorState.Connected, c.State, "still connected");
+    }
+}

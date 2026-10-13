@@ -55,6 +55,15 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
 
     public string Identity => Convert.ToHexString(PublicKey).ToLowerInvariant();
 
+    /// <summary>How many times the whole contact list has been read from this node.</summary>
+    public int ContactListReads { get; private set; }
+
+    /// <summary>How many CMD_REMOVE_CONTACT commands this node has been sent.</summary>
+    public int RemovalsServed { get; private set; }
+
+    /// <summary>After this many removals, stop replying to them, as a node busy with flash does.</summary>
+    public int StallAfterRemovals { get; set; }
+
     public byte[] AddContact(string name, int type = 1)
     {
         var key = RandomNumberGenerator.GetBytes(32);
@@ -208,6 +217,7 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 break;
             case CmdGetContacts:
             {
+                ContactListReads++;
                 var start = new byte[5];
                 start[0] = RespContactsStart;
                 BinaryPrimitives.WriteUInt32LittleEndian(start.AsSpan(1), (uint)Contacts.Count);
@@ -339,6 +349,10 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
             {
                 var key = cmd.AsSpan(1, 32).ToArray();
                 var removed = Contacts.RemoveAll(c => c.Key.AsSpan().SequenceEqual(key));
+                RemovalsServed++;
+                // A real node writing flash can simply stop answering for a while. Setting
+                // this reproduces that without waiting for one to happen.
+                if (StallAfterRemovals > 0 && RemovalsServed > StallAfterRemovals) break;
                 await WriteAsync(s, removed > 0 ? [RespOk] : [RespErr, ErrNotFound]);
                 break;
             }

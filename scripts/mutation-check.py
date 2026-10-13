@@ -30,10 +30,31 @@ def run():
     tail = [l for l in p.stdout.splitlines() if 'passed in' in l]
     return p.returncode, (tail[-1] if tail else p.stdout[-300:] + p.stderr[-300:])
 
+# A mutation left behind by an interrupted run looks exactly like a broken suite and
+# wastes the next hour, so put every file back before starting, whatever happened last time.
+for _, path, old, new in MUTATIONS:
+    text = path.read_text()
+    if text.count(new) == 1 and text.count(old) == 0:
+        path.write_text(text.replace(new, old, 1))
+        print(f"restored after an interrupted run: {path.name}")
+
 code, summary = run()
 print(f"baseline: {summary}")
 if code != 0:
     sys.exit("the suite is not green before mutating")
+
+# Restore on Ctrl-C or a kill as well as on the normal path: a half-applied mutation left
+# in the tree is worse than no check at all.
+import signal
+_originals = {}
+
+def _restore(*_):
+    for path, text in _originals.items():
+        path.write_text(text)
+    sys.exit("interrupted; every file restored")
+
+signal.signal(signal.SIGINT, _restore)
+signal.signal(signal.SIGTERM, _restore)
 
 survived = []
 for name, path, old, new in MUTATIONS:
@@ -41,11 +62,13 @@ for name, path, old, new in MUTATIONS:
     if text.count(old) != 1:
         survived.append(f"{name} (pattern not found — the code moved)")
         continue
+    _originals[path] = text
     path.write_text(text.replace(old, new, 1))
     try:
         code, summary = run()
     finally:
         path.write_text(text)
+        _originals.pop(path, None)
     verdict = 'CAUGHT' if code != 0 else 'SURVIVED'
     print(f"{verdict}: {name} — {summary}")
     if code == 0:

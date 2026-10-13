@@ -192,3 +192,9 @@ public enum ChannelKind
 
 /// <summary>A channel slot configured on our node.</summary>
 public sealed record ChannelInfo(int Index, string Name, ChannelKind Kind, bool Primary);
+
+/// <summary>What a bulk contact removal managed, and why it stopped if it did.</summary>
+public sealed record BulkRemoval(int Removed, int Requested, string? Error)
+{
+    public bool Complete => Error is null && Removed == Requested;
+}

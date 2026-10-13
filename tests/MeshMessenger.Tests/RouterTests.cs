@@ -39,6 +39,8 @@ public sealed class StubConnector(string id, MeshNetwork network) : IMeshConnect
     public int RememberedPeerLimit => int.MaxValue;
     public bool? RecycleOldestWhenFull => null;
     public Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) => Task.FromResult<string?>(null);
+    public Task<BulkRemoval> RemovePeersAsync(IReadOnlyList<string> peerIds, CancellationToken ct) =>
+        Task.FromResult(new BulkRemoval(peerIds.Count, peerIds.Count, null));
     public Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct) => Task.FromResult<string?>(null);
     public Task<string?> SetPeerFavouriteAsync(string peerId, bool favourite, CancellationToken ct) => Task.FromResult<string?>(null);
     public int Limit { get; set; } = 200;

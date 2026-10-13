@@ -175,6 +175,19 @@ public abstract class MeshConnectorBase : IMeshConnector
     public virtual Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) =>
         Task.FromResult<string?>($"{DisplayName} doesn't keep a contact list Zeus can change.");
 
+    public virtual async Task<BulkRemoval> RemovePeersAsync(IReadOnlyList<string> peerIds, CancellationToken ct)
+    {
+        var removed = 0;
+        string? error = null;
+        foreach (var id in peerIds)
+        {
+            var failure = await RemovePeerAsync(id, ct).ConfigureAwait(false);
+            if (failure is null) removed++;
+            else error ??= failure;
+        }
+        return new BulkRemoval(removed, peerIds.Count, error);
+    }
+
     public virtual Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct) =>
         Task.FromResult<string?>($"{DisplayName} has no such setting.");
 

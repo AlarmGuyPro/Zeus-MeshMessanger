@@ -89,6 +89,13 @@ The Nodes tab shows how many slots are used. Three ways to keep it healthy:
   not heard in 7, 30 or 90 days. Zeus counts them and asks before removing
   anything. Favourites and room servers are never included, and neither is a
   station whose age the node doesn't know.
+
+  Clearing a few hundred contacts takes a minute or two. The node writes its
+  contact list to flash, so Zeus removes them one at a time with a pause
+  between, and reads the list back once at the end rather than after every
+  removal. Leave Zeus open and watch the count go down. If the node falls
+  behind and stops answering, Zeus stops, tells you how many it managed, and
+  stays connected — run it again when the node has caught up.
 - **☆ next to a contact** makes it a favourite. Recycling never drops a
   favourite, so star the stations you actually message and they will survive
   any amount of repeater traffic.

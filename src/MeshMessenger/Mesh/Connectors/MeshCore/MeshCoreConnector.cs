@@ -202,21 +202,49 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         }
     }
 
+    /// <summary>
+    /// How many checks in a row may go unanswered before the session is treated as dead.
+    /// One is not enough: a node busy writing flash — clearing hundreds of contacts, say —
+    /// can miss a check and still be perfectly alive, and tearing the session down there
+    /// makes the node look like it has vanished in the middle of the operation.
+    /// </summary>
+    private const int KeepAliveStrikes = 3;
+
     private async Task KeepAliveAsync(CancellationToken ct)
     {
+        var missed = 0;
         while (!ct.IsCancellationRequested)
         {
             // Wake at once when the node says a message is waiting; otherwise every 5 s.
             await _wake.WaitAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             ExpireAcks();
-            if (Interlocked.Exchange(ref _syncRequested, 0) == 1)
+            try
             {
-                await DrainMessagesAsync(queuedWhileAway: false, ct).ConfigureAwait(false);
+                if (Interlocked.Exchange(ref _syncRequested, 0) == 1)
+                {
+                    await DrainMessagesAsync(queuedWhileAway: false, ct).ConfigureAwait(false);
+                }
+                // A bulk operation is talking to the node constantly; it needs no help
+                // proving the connection is alive, and the extra command only adds load.
+                if (!BulkRunning && Options.Time.GetUtcNow() - _lastTraffic > KeepAliveInterval)
+                {
+                    // Also notices a dead TCP connection.
+                    await CommandAsync(GetBattery(), c => c == RespBattAndStorage, ct).ConfigureAwait(false);
+                }
+                missed = 0;
             }
-            if (Options.Time.GetUtcNow() - _lastTraffic > KeepAliveInterval)
+            catch (TimeoutException)
             {
-                // Also notices a dead TCP connection.
-                await CommandAsync(GetBattery(), c => c == RespBattAndStorage, ct).ConfigureAwait(false);
+                missed++;
+                Log(LogLevel.Warning, missed >= KeepAliveStrikes
+                    ? $"The node has not answered {missed} checks in a row; reconnecting."
+                    : $"The node didn't answer a check ({missed} of {KeepAliveStrikes}). It may be busy; waiting.");
+                if (missed >= KeepAliveStrikes) throw;
+            }
+            catch (MeshCoreException ex)
+            {
+                // The node answered, with a complaint. That is not a dead connection.
+                Log(LogLevel.Warning, $"The node refused a routine check: {ex.Message} (code {ex.Code}).");
             }
         }
     }
@@ -707,6 +735,86 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         {
             return "The node didn't answer.";
         }
+    }
+
+    /// <summary>
+    /// How long to wait between removals. A node writes its contact list to flash, and a
+    /// tight loop of deletes starves everything else it has to do — on a real node with 323
+    /// repeaters to clear, it stopped answering altogether and Zeus dropped the session.
+    /// </summary>
+    private static readonly TimeSpan BulkPace = TimeSpan.FromMilliseconds(25);
+
+    private int _bulkDepth;
+
+    /// <summary>True while a bulk operation holds the node's attention.</summary>
+    private bool BulkRunning => Volatile.Read(ref _bulkDepth) > 0;
+
+    public override async Task<BulkRemoval> RemovePeersAsync(IReadOnlyList<string> peerIds, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return new BulkRemoval(0, peerIds.Count, $"{DisplayName} is not connected.");
+        if (peerIds.Count == 0) return new BulkRemoval(0, 0, null);
+
+        Interlocked.Increment(ref _bulkDepth);
+        var removed = 0;
+        string? error = null;
+        try
+        {
+            Log(LogLevel.Info, $"Removing {peerIds.Count} contact{(peerIds.Count == 1 ? "" : "s")} from the node.");
+            foreach (var id in peerIds)
+            {
+                if (ct.IsCancellationRequested) { error = "Stopped before it finished."; break; }
+                Contact? contact;
+                lock (_gate) contact = FindContact(id);
+                if (contact is null) continue; // already gone
+                try
+                {
+                    await CommandAsync(RemoveContact(contact.PublicKey), c => c is RespOk, ct).ConfigureAwait(false);
+                }
+                catch (MeshCoreException ex)
+                {
+                    // One contact the node won't part with is not a reason to stop.
+                    error ??= $"{ex.Message} (code {ex.Code})";
+                    continue;
+                }
+                catch (Exception ex) when (ex is IOException or TimeoutException)
+                {
+                    error = $"The node stopped answering after {removed} of {peerIds.Count}. Nothing else was removed; run it again when it has caught up.";
+                    Log(LogLevel.Warning, error);
+                    break;
+                }
+                // Keep Zeus's own copy in step rather than re-reading the whole list each
+                // time: that re-read is what turned 323 removals into tens of thousands of
+                // frames and buried the node.
+                lock (_gate) _contacts.Remove(Convert.ToHexString(contact.PublicKey));
+                removed++;
+                if (removed % 25 == 0)
+                {
+                    Log(LogLevel.Info, $"Removed {removed} of {peerIds.Count}...");
+                    RaiseChanged();
+                }
+                await Task.Delay(BulkPace, Options.Time, ct).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            error ??= "Stopped before it finished.";
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _bulkDepth);
+        }
+
+        // One read at the end, so Zeus and the node agree however it went.
+        try
+        {
+            await LoadContactsAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is MeshCoreException or IOException or TimeoutException or OperationCanceledException)
+        {
+            RaiseChanged();
+        }
+        Log(LogLevel.Info, $"Removed {removed} of {peerIds.Count} contact{(peerIds.Count == 1 ? "" : "s")}.");
+        return new BulkRemoval(removed, peerIds.Count, error);
     }
 
     public override bool CanEditChannels => true;

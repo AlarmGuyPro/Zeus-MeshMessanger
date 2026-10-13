@@ -291,15 +291,10 @@ internal static class Endpoints
             var doomed = Doomed(c, body).ToList();
             // Preview first: the panel shows the count and asks before anything is removed.
             if (body.Preview == true) return Results.Ok(new ActionResultDto(true, null, doomed.Count));
-            var removed = 0;
-            string? failure = null;
-            foreach (var p in doomed)
-            {
-                var error = await c.RemovePeerAsync(p.Id, ct).ConfigureAwait(false);
-                if (error is null) removed++;
-                else failure ??= error;
-            }
-            return Results.Ok(new ActionResultDto(failure is null, failure, removed));
+            // One bulk call, not a loop of single removals: the connector paces itself and
+            // reads the contact list back once at the end instead of once per contact.
+            var result = await c.RemovePeersAsync(doomed.Select(p => p.Id).ToList(), ct).ConfigureAwait(false);
+            return Results.Ok(new ActionResultDto(result.Error is null, result.Error, result.Removed));
         });
 
         e.MapPost("nodes/{id}/channels", async (string id, JoinChannelRequest body, CancellationToken ct) =>

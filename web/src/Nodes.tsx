@@ -324,7 +324,12 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
       setNote(
         result.ok
           ? { kind: "ok", text: `Removed ${result.count} contact${result.count === 1 ? "" : "s"} from the node.` }
-          : { kind: "warn", text: result.error ?? "Couldn’t remove them all." },
+          : {
+              kind: "warn",
+              // A partial result is the common case when a node gets behind, so say how far
+              // it got rather than only what went wrong.
+              text: `Removed ${result.count} of ${cleanup.count}. ${result.error ?? "Couldn’t remove them all."}`,
+            },
       );
       setCleanup(null);
       reloadPeers();
@@ -517,6 +522,7 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
               <div className={cx("thread-tools")}>
                 <span className={cx("warn")}>
                   Remove {cleanup.count} contact{cleanup.count === 1 ? "" : "s"} from {node.name}?
+                  {cleanup.count >= 50 && " That takes a minute or two — the node is removed one contact at a time so it keeps up. Leave Zeus open; the count updates as it goes."}
                 </span>
                 <button
                   type="button"

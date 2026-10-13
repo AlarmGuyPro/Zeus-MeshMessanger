@@ -67,6 +67,14 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>Removes a contact from the node's list. Local to the node. Returns null on success, or the reason.</summary>
     Task<string?> RemovePeerAsync(string peerId, CancellationToken ct);
 
+    /// <summary>
+    /// Removes many contacts in one operation. Separate from <see cref="RemovePeerAsync"/>
+    /// because clearing hundreds of them one call at a time is not the same job: it has to
+    /// pace itself so the node keeps up, read the list back once rather than once per
+    /// contact, and stop cleanly without taking the connection down with it.
+    /// </summary>
+    Task<BulkRemoval> RemovePeersAsync(IReadOnlyList<string> peerIds, CancellationToken ct);
+
     /// <summary>Turns the node's "recycle the oldest contact when full" setting on or off.</summary>
     Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct);
 
