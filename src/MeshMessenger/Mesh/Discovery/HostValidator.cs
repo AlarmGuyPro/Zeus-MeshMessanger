@@ -15,8 +15,15 @@ namespace MeshMessenger.Discovery;
 /// </summary>
 public static class HostValidator
 {
+    /// <summary>
+    /// What the plugin ships with: loopback refused, so a node address can never name a
+    /// service on the Zeus computer itself. The test suite asserts this constant is false,
+    /// because the only reason it exists is to be switched on for a simulated node.
+    /// </summary>
+    internal const bool ShippedAllowsLoopback = false;
+
     /// <summary>Loopback is refused. Only the test suite turns this on, to reach simulated nodes.</summary>
-    internal static bool AllowLoopback { get; set; }
+    internal static bool AllowLoopback { get; set; } = ShippedAllowsLoopback;
 
     /// <summary>An address found by discovery: an IP (optionally with port) on the local network.</summary>
     public static bool IsLocalHost(string host) =>

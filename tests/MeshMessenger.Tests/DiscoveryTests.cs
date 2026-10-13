@@ -38,7 +38,7 @@ public static class DiscoveryTests
         other.Stop();
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task ScanFindsNodesOnAnAddedRange()
     {
         await using var mc = new FakeMeshCoreNode("127.0.0.2", 0);
@@ -66,7 +66,7 @@ public static class DiscoveryTests
         Assert.False(HostValidator.IsLocal(IPAddress.Parse("1.1.1.1")), "public address not local");
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task RefindFindsTheSameNodeAtANewAddressAndTheConnectorFollowsIt()
     {
         await using var moved = new FakeMeshCoreNode("127.0.0.5", 0);
@@ -90,7 +90,7 @@ public static class DiscoveryTests
         Assert.Equal("127.0.0.5", newHost, "address updated");
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task NodeWithSavedPasswordsWaitsForConfirmationBeforeMoving()
     {
         await using var moved = new FakeMeshCoreNode("127.0.0.6", 0);

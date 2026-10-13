@@ -10,7 +10,15 @@ using Zeus.Plugins.Contracts;
 namespace MeshMessenger.Tests;
 
 [AttributeUsage(AttributeTargets.Method)]
-public sealed class TestAttribute : Attribute;
+public sealed class TestAttribute : Attribute
+{
+    /// <summary>
+    /// Lets this one test reach a simulated node on 127.0.0.x. The suite's default is the
+    /// shipped default — loopback refused — so the refusal path is exercised rather than
+    /// switched off for everything. A test that needs a fake node says so here.
+    /// </summary>
+    public bool Loopback { get; init; }
+}
 
 public sealed class AssertionException(string message) : Exception(message);
 
@@ -98,8 +106,6 @@ public static class Program
     public static async Task<int> Main(string[] args)
     {
         var filter = args.FirstOrDefault();
-        // Simulated nodes listen on 127.0.0.x. The plugin itself never allows loopback.
-        MeshMessenger.Discovery.HostValidator.AllowLoopback = true;
         var tests = typeof(Program).Assembly.GetTypes()
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Where(m => m.GetCustomAttribute<TestAttribute>() is not null)
@@ -113,6 +119,11 @@ public static class Program
         foreach (var (name, method) in tests)
         {
             var sw = Stopwatch.StartNew();
+            // Simulated nodes listen on 127.0.0.x, so some tests need loopback allowed.
+            // It is granted for that test only; everything else runs with the shipped
+            // default, which refuses it. Tests run one at a time, so this is safe.
+            MeshMessenger.Discovery.HostValidator.AllowLoopback =
+                method.GetCustomAttribute<TestAttribute>()!.Loopback;
             try
             {
                 var result = method.Invoke(null, null);
@@ -130,6 +141,10 @@ public static class Program
                 var inner = ex is TargetInvocationException { InnerException: { } i } ? i : ex;
                 Console.WriteLine($"  FAIL  {name}: {inner.GetType().Name}: {inner.Message}");
                 if (inner is not AssertionException) Console.WriteLine(inner.StackTrace);
+            }
+            finally
+            {
+                MeshMessenger.Discovery.HostValidator.AllowLoopback = false;
             }
         }
         Console.WriteLine($"{tests.Count - failures}/{tests.Count} passed in {total.ElapsedMilliseconds} ms");

@@ -225,6 +225,14 @@ public sealed class DiscoveryService : IAsyncDisposable
     /// (Meshtastic), the /24 it was last seen in, then the saved ranges.
     /// Returns the address it was found at, or null.
     /// </summary>
+    /// <summary>
+    /// The addresses a moved node may be probed at: local ones only, deduplicated. A name of
+    /// its own so the rule can be tested rather than inspected — DNS and mDNS answers come
+    /// from the network and a node must never be chased to an Internet address.
+    /// </summary>
+    internal static IEnumerable<IPAddress> LocalCandidates(IEnumerable<IPAddress> candidates) =>
+        candidates.Distinct().Where(HostValidator.IsLocal);
+
     public async Task<string?> RefindAsync(MeshNetwork network, string identity, string lastHost, int port, CancellationToken ct)
     {
         var hostOnly = Uri.TryCreate("http://" + lastHost, UriKind.Absolute, out var uri) ? uri.Host.Trim('[', ']') : lastHost;
@@ -248,9 +256,8 @@ public sealed class DiscoveryService : IAsyncDisposable
                 .Select(h => h.Address));
         }
 
-        foreach (var address in candidates.Distinct())
+        foreach (var address in LocalCandidates(candidates))
         {
-            if (!HostValidator.IsLocal(address)) continue;
             var node = await NodeProbe.ProbeAsync(network, address.ToString(), port, ct, _options.ConnectTimeout, _options.IdentifyTimeout).ConfigureAwait(false);
             if (node is not null && string.Equals(node.Identity, identity, StringComparison.OrdinalIgnoreCase)) return address.ToString();
         }

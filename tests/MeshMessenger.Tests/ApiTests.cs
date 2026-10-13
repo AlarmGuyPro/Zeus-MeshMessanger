@@ -66,7 +66,7 @@ public sealed class PluginHost : IAsyncDisposable
 
 public static class ApiTests
 {
-    [Test]
+    [Test(Loopback = true)]
     public static async Task AddNodeReceiveReplyAndSurviveARestart()
     {
         await using var node = new FakeMeshCoreNode();
@@ -111,7 +111,7 @@ public static class ApiTests
         }
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task DebugLogAdvertAndHousekeepingOverTheApi()
     {
         await using var node = new FakeMeshCoreNode();
@@ -165,7 +165,7 @@ public static class ApiTests
     /// they chose to keep: a favourite is exactly the thing you starred so it
     /// would survive, and a room server is the room itself.
     /// </summary>
-    [Test]
+    [Test(Loopback = true)]
     public static async Task CleanupRemovesRepeatersButNeverFavouritesOrRooms()
     {
         await using var node = new FakeMeshCoreNode();
@@ -204,7 +204,7 @@ public static class ApiTests
         Assert.True(left.Contains("KE0XYZ Mobile"), "the station survived");
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task JoinedChannelsAreListedAndCanBePostedToBeforeAnyTraffic()
     {
         await using var node = new FakeMeshCoreNode();
@@ -251,7 +251,7 @@ public static class ApiTests
         Assert.False(b4!["ok"]!.GetValue<bool>(), "no such node");
     }
 
-    [Test]
+    [Test(Loopback = true)]
     public static async Task ScanOverTheApiFindsANodeAndMarksItAddedOnceAdded()
     {
         // The plugin scans the real MeshCore port, so the fake must listen on 5000.
