@@ -27,9 +27,9 @@ mutation run in particular found a real gap, and it is now part of the build.
 | Platforms | `any` — fully managed, no native or platform-specific files |
 | License | GPL-3.0-or-later (feature-owned `LICENSE` in the package) |
 | Source | https://github.com/AlarmGuyPro/Zeus-MeshMessanger |
-| Commit | `0bda3574bb39071b868d1922ba68a3ff2fdcf7e6` |
+| Commit | `986bbd9bb6273e4fbcb921110b5cb5adfab4d95e` |
 | Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip |
-| SHA-256 | `ea697ccf2e404a2f1fb2bf6a8ab3f98e047016bf144361cb4ec545b2ea1771ea` |
+| SHA-256 | `bbb345149e35fed650467243581e8e0f908f26d2d3321289cecdbe39742b9986` |
 
 ## What the review asked for, and what changed
 

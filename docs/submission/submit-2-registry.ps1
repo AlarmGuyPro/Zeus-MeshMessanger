@@ -26,8 +26,8 @@ param(
     [string] $Upstream = 'Zeus-SDR/zeus-community-features',
     [string] $FeatureId = 'io.github.alarmguypro.meshmessenger',
     [string] $Version = '1.0.0',
-    [string] $Commit = '0bda3574bb39071b868d1922ba68a3ff2fdcf7e6',
-    [string] $Sha256 = 'ea697ccf2e404a2f1fb2bf6a8ab3f98e047016bf144361cb4ec545b2ea1771ea',
+    [string] $Commit = '986bbd9bb6273e4fbcb921110b5cb5adfab4d95e',
+    [string] $Sha256 = 'bbb345149e35fed650467243581e8e0f908f26d2d3321289cecdbe39742b9986',
     [switch] $Force
 )
 

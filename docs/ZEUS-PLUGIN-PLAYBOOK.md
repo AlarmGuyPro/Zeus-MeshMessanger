@@ -234,3 +234,45 @@ character from what we had been testing. The guide now leads with the password.
   "Remove 37 contacts from KQ4WLR Zeus?"
 - **Commit messages are the project's memory.** Write why, not what. When
   picking this up cold, `git log` was more useful than any status document.
+
+## 11. What a maintainer review actually finds
+
+Ours returned six findings on a feature that already passed every automated
+gate. Three patterns in them are worth carrying forward, because they are not
+specific to this feature:
+
+**A guard with no failing test is a comment.** The best finding was a mutation
+run: four changes to security-relevant code, all 32 tests still passing. The
+cause was the test harness, which switched the guard off globally because the
+simulated devices needed it off. Write the fakes so the suite runs with the
+*shipped* defaults, and grant an exception per test. Then keep the mutation run
+as a script in the repository and run it before every submission.
+
+**The same rule applied in two places, enforced in one.** An index was
+validated when a name was displayed and not when a transmitter was keyed. Look
+for a check that exists on the read path and not on the write path; that is
+where this kind of bug lives.
+
+**Persistence that works until it doesn't.** Serialising everything into one
+settings value is fine for a week of use and loses the lot on the day it
+crosses the host's document limit — which deletes the old value before writing
+the new one. Write per record, write only what changed, and bound the total on
+purpose so nothing is ever lost by accident.
+
+And one about documentation: help that describes unbuilt features is a review
+finding, not a nicety. Ours described rooms, route tools and a health tab for
+months. Deleting them was the fix, and the reference became easier to defend —
+with the unshipped features gone, nothing in the panel transmitted on its own,
+which is a much better sentence than a column of defaults.
+
+## 12. Build the screenshot harness once, in the repository
+
+§5 says to automate the screenshots. Go further: commit the harness. We built
+it twice, from scratch, in two sessions, because it lived in a scratch
+directory both times. It is a preview host that runs the real backend with the
+fake devices behind it plus one Playwright script, it takes about an hour to
+write and under a minute to run, and it immediately found a state that was
+signalled by border colour alone.
+
+Keep its dependencies outside the directory the catalog rebuilds, and keep its
+output out of git — a tracked binary fails the rebuild check.
