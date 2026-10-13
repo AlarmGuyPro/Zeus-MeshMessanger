@@ -6,6 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
+| [v1.0.1](v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip) | main @ 21a07e2 | **The one to submit.** Everything in 1.0.0 plus seven findings from a day on a busy mesh: hashtag case warning, newest-message-first, bulk contact removal that doesn't bury the node, and a control for what the node saves by itself |
 | [v1.0.0](v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip) | main @ 986bbd9 | All six maintainer review findings answered; Logs tab, which records every message in and out; version shown in the panel |
 | [v0.4.1](v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip) | main @ f4e26ca | **Listed in the Zeus community catalog** (PR #19 merged). Meshtastic node no longer reports a full contact list |
 | [v0.4.0](v0.4.0/io.github.alarmguypro.meshmessenger-0.4.0.zip) | main @ 205655b | Message a channel sender, tidy contacts, join/leave MeshCore channels |
@@ -19,11 +20,11 @@ source tree.
 Install: Zeus → Features → Community → Install local feature → choose the ZIP.
 Test steps: `docs/TESTING.md` on `main`.
 
-All three catalog gates pass on v1.0.0: package validation, the security scan
+All three catalog gates pass on v1.0.1: package validation, the security scan
 (CLEAR, 0 fail, 0 review) and the source rebuild from a clean clone of the
 pinned commit. 48/48 tests, and the four security mutations from the catalog
 review each turn the suite red (`scripts/mutation-check.py` on `main`).
 
-v1.0.0 is **not released or submitted yet** — it waits for bench testing,
-because the registry pins the SHA-256 of one exact archive and a published
-release can never be replaced.
+v1.0.0 was gated but never released: a day of bench use produced seven more
+findings, and two builds must not answer to the same version now that the
+panel shows it. Submit v1.0.1.
