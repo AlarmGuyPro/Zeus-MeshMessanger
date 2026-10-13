@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
-  Step 2: fork the Zeus catalog, add the Mesh Messenger 1.0.1 version to the
+  Step 2: fork the Zeus catalog, add the Mesh Messenger 1.0.3 version to the
   existing entry in registry.json, and push the branch ready for a pull request.
 
 .DESCRIPTION
   Mesh Messenger is already listed: pull request #19 was merged, so registry.json
-  carries the entry with version 0.4.1. This adds 1.0.1 as another element of that
+  carries the entry with version 0.4.1. This adds 1.0.3 as another element of that
   entry's 'versions' array and leaves the published 0.4.1 object untouched — the
   catalog's custody test rejects any edit to a version it has already published.
 
@@ -25,9 +25,9 @@ param(
     [string] $WorkDir = "$HOME",
     [string] $Upstream = 'Zeus-SDR/zeus-community-features',
     [string] $FeatureId = 'io.github.alarmguypro.meshmessenger',
-    [string] $Version = '1.0.1',
-    [string] $Commit = '21a07e23ffed0e49469886e9b6204e3ef6e3ee7b',
-    [string] $Sha256 = 'abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b',
+    [string] $Version = '1.0.3',
+    [string] $Commit = '8e21064a7f5154ced78006302e0052b9a1ff331d',
+    [string] $Sha256 = '09a3389462776798f46a995a23f0f79bfbfbb17eeef6d7f8a2beb909a77b68aa',
     [switch] $Force
 )
 
@@ -149,7 +149,7 @@ Could not find the end of this feature's versions array in registry.json.
 
 Add the new version by hand instead, from REGISTRY-ENTRY.json: append it to the
 'versions' array of the io.github.alarmguypro.meshmessenger entry, after the
-0.4.1 object, and change nothing else. registry-1.0.1.patch shows the exact edit.
+0.4.1 object, and change nothing else. registry-1.0.3.patch shows the exact edit.
 "@
 }
 

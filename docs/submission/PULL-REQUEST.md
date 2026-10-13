@@ -1,16 +1,16 @@
-# Pull request body — Mesh Messenger 1.0.1
+# Pull request body — Mesh Messenger 1.0.3
 
 Catalog PR title:
 
 ```text
-feat(registry): add io.github.alarmguypro.meshmessenger 1.0.1
+feat(registry): add io.github.alarmguypro.meshmessenger 1.0.3
 ```
 
 ---
 
 ## What this is
 
-Mesh Messenger 1.0.1, a new version of a feature already in the catalog
+Mesh Messenger 1.0.3, a new version of a feature already in the catalog
 (0.4.1, merged in #19). The entry gains one element in its `versions` array;
 the published 0.4.1 object is untouched.
 
@@ -22,14 +22,14 @@ mutation run in particular found a real gap, and it is now part of the build.
 | | |
 |---|---|
 | Feature ID | `io.github.alarmguypro.meshmessenger` |
-| Version | 1.0.1 |
+| Version | 1.0.3 |
 | SDK | ABI 1, minimum 1.5.0 |
 | Platforms | `any` — fully managed, no native or platform-specific files |
 | License | GPL-3.0-or-later (feature-owned `LICENSE` in the package) |
 | Source | https://github.com/AlarmGuyPro/Zeus-MeshMessanger |
-| Commit | `21a07e23ffed0e49469886e9b6204e3ef6e3ee7b` |
-| Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip |
-| SHA-256 | `abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b` |
+| Commit | `8e21064a7f5154ced78006302e0052b9a1ff331d` |
+| Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.3/io.github.alarmguypro.meshmessenger-1.0.3.zip |
+| SHA-256 | `09a3389462776798f46a995a23f0f79bfbfbb17eeef6d7f8a2beb909a77b68aa` |
 
 ## What the review asked for, and what changed
 

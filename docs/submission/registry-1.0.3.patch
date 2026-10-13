@@ -16,18 +16,18 @@ index e34fcc7..d06a3de 100644
            }
 +        },
 +        {
-+          "version": "1.0.1",
++          "version": "1.0.3",
 +          "sdkAbi": 1,
 +          "sdkMinVersion": "1.5.0",
 +          "platforms": [
 +            "any"
 +          ],
-+          "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip",
-+          "sha256": "abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b",
++          "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v1.0.3/io.github.alarmguypro.meshmessenger-1.0.3.zip",
++          "sha256": "09a3389462776798f46a995a23f0f79bfbfbb17eeef6d7f8a2beb909a77b68aa",
 +          "source": {
 +            "repository": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-+            "commit": "21a07e23ffed0e49469886e9b6204e3ef6e3ee7b",
-+            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip"
++            "commit": "8e21064a7f5154ced78006302e0052b9a1ff331d",
++            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.3/io.github.alarmguypro.meshmessenger-1.0.3.zip"
 +          }
          }
        ]

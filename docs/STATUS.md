@@ -1,6 +1,6 @@
 # Where this project stands
 
-Last updated 13 October 2026, with 1.0.1 built, gated and bench-tested.
+Last updated 13 October 2026, with 1.0.3 built, gated and bench-tested.
 Read this first when picking the project back up.
 
 ## Shipped, and listed
@@ -10,19 +10,18 @@ Read this first when picking the project back up.
 merged and the package is mirrored into custody. It shipped in the Zeus
 release of 12 October.
 
-**1.0.1 is built, gated and bench-tested**, and is the one to submit. (1.0.0
-was built and gated but never released: a day of real use produced seven
-findings, and two builds must not both answer to the same version now that the
-panel shows it.)
+**1.0.3 is the one to submit.** 1.0.0 to 1.0.2 were built and gated but never
+released: each was superseded within hours by something a bench found. 1.0.2
+in particular should never be submitted — it carries the channel crash below.
 
 | | |
 |---|---|
-| Pinned commit | `21a07e23ffed0e49469886e9b6204e3ef6e3ee7b` |
-| SHA-256 | `abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b` |
+| Pinned commit | `8e21064a7f5154ced78006302e0052b9a1ff331d` |
+| SHA-256 | `09a3389462776798f46a995a23f0f79bfbfbb17eeef6d7f8a2beb909a77b68aa` |
 | Package validation | pass |
 | Security scan | CLEAR, 0 fail, 0 review |
 | Source rebuild | clear, from a clean clone of the pinned commit |
-| Registry edit | `validate-registry` and `test-community-custody` pass with 1.0.1 appended; the exact diff is `docs/submission/registry-1.0.1.patch` |
+| Registry edit | `validate-registry` and `test-community-custody` pass with 1.0.1 appended; the exact diff is `docs/submission/registry-1.0.3.patch` |
 | Tests | 55/55 |
 | Mutation check | all four of the maintainer's mutations turn the suite red |
 
@@ -70,7 +69,30 @@ A day of real use on a busy mesh, in the order it was found:
    entirely unless the node is also made selective — so the obvious control
    would have done nothing. See `docs/protocols/meshcore.md`.
 
-## One report that turned out not to be a bug
+## The crash, which was a bug
+
+Clicking a channel and then another took Zeus's whole workspace down. One line,
+in the newest-first ordering added that afternoon:
+
+```tsx
+useEffect(() => el?.scrollTo({ top: 0 }), [id]);   // wrong, no braces
+```
+
+React keeps whatever an effect returns and calls it as the cleanup. `scrollTo`
+returns undefined by specification — and the Zeus webview ships a chainable
+scroll polyfill that returns the element, so React called a `<div>` and threw
+`d is not a function` from inside its own minified code.
+
+It reproduced on the bench every time and in plain Chromium never.
+`tests/preview/regression.mjs` now renders the panel under simulated host
+quirks and fails if the error boundary appears; it fails without the fix.
+
+Two things made the difference, and both are in the playbook now: the error
+boundary, which turned a dead workspace into an error string and a Copy button,
+and taking the operator's description at face value — "clicking a channel
+crashes Zeus" was exact, and two rounds were spent doubting it.
+
+## One report that was not a bug
 
 A bench report of "viewing the channels crashed Zeus and reset the workspace",
 minutes after installing 1.0.1. Zeus's own log says otherwise, and the sequence
