@@ -38,6 +38,12 @@ public static class Preview
             ManualAddContacts = 0,
         };
         await using var meshtastic = new FakeMeshtasticNode();
+        // Messages the node was holding before Zeus ever connected: they arrive in the first
+        // drain marked "queued while away", which is the one path a live node exercises on
+        // every start and a preview that only sends traffic afterwards never does.
+        await meshcore.HearChannelAsync(0, "W0QQ Base", "held while Zeus was away");
+        await meshcore.HearChannelAsync(0, "KE0XYZ Mobile", "also held");
+
         var settings = new MemorySettings();
         var plugin = new MeshMessengerPlugin();
         await plugin.InitializeAsync(new FakePluginContext { Settings = settings }, default);
