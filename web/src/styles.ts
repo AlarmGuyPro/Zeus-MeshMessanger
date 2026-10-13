@@ -151,6 +151,8 @@ ${e("button")} {
   cursor: pointer;
 }
 ${e("button--primary")} { border-color: var(--accent); }
+/* A chosen option in a group. Never colour alone: the label carries a mark too. */
+${e("button--on")} { border-color: var(--accent); background: var(--bg-1); font-weight: 700; }
 ${e("button")}:disabled { cursor: not-allowed; color: var(--fg-3); border-color: var(--line); }
 ${r} :focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
 ${e("notice")} {

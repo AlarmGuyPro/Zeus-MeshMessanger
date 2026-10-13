@@ -1,29 +1,24 @@
 {
-  "_comment": "Paste the object below into the catalog's registry.json plugins array, and set the registry's top-level generated field to the current UTC RFC 3339 timestamp in the same commit. Do not commit this file to the catalog; it lives here as the record of what was submitted.",
-  "entry": {
-    "id": "io.github.alarmguypro.meshmessenger",
-    "channel": "community",
-    "name": "Mesh Messenger",
-    "description": "Read, send and reply to Meshtastic and MeshCore messages through Wi-Fi-connected LoRa nodes, in one inbox that keeps each network separate.",
-    "author": "KQ4WLR",
-    "license": "GPL-3.0-or-later",
-    "homepage": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-    "categories": ["tools"],
-    "verified": false,
-    "versions": [
-      {
-        "version": "0.4.1",
-        "sdkAbi": 1,
-        "sdkMinVersion": "1.5.0",
-        "platforms": ["any"],
-        "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip",
-        "sha256": "a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc",
-        "source": {
-          "repository": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-          "commit": "f4e26ca7cba194ae713a25d7b60d8fa653bcb391",
-          "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip"
-        }
-      }
-    ]
+  "_comment": [
+    "Mesh Messenger is ALREADY LISTED in the Zeus community catalog: PR #19 was merged and",
+    "registry.json carries the entry io.github.alarmguypro.meshmessenger with version 0.4.1.",
+    "So 1.0.0 is a new element APPENDED to that entry's 'versions' array — not a new element",
+    "of 'plugins'. Leave the 0.4.1 object exactly as it is: the catalog's custody test rejects",
+    "any edit to a version it has already published.",
+    "The exact edit is in registry-1.0.0.patch, and submit-2-registry.ps1 applies it.",
+    "The object below is what to add, indented to the catalog's style (10 spaces at the brace)."
+  ],
+  "version": "1.0.0",
+  "sdkAbi": 1,
+  "sdkMinVersion": "1.5.0",
+  "platforms": [
+    "any"
+  ],
+  "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip",
+  "sha256": "ea697ccf2e404a2f1fb2bf6a8ab3f98e047016bf144361cb4ec545b2ea1771ea",
+  "source": {
+    "repository": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
+    "commit": "0bda3574bb39071b868d1922ba68a3ff2fdcf7e6",
+    "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip"
   }
 }

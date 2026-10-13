@@ -1,0 +1,12 @@
+{
+  "name": "meshmessenger-preview",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dependencies for the panel preview and the screenshot script. Deliberately outside web/ so they are not part of the build the Zeus catalog rebuilds and scans.",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

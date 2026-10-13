@@ -115,9 +115,10 @@ export function Logs({ client }: { client: Client }) {
               key={v.id}
               type="button"
               aria-pressed={view === v.id}
-              className={`${cx("button")} ${view === v.id ? cx("button--primary") : ""}`}
+              className={`${cx("button")} ${view === v.id ? cx("button--on") : ""}`}
               onClick={() => setView(v.id)}
             >
+              {view === v.id ? "● " : ""}
               {v.label}
             </button>
           ))}

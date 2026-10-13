@@ -62,3 +62,26 @@ workspace.
 
 If something fails, the node's status line (hover it in the node bar) has the
 reason. Note the firmware version from the Nodes tab when reporting.
+
+## Looking at the panel without hardware
+
+The preview serves the real panel against the real backend with simulated nodes
+behind it, and the screenshot script takes the whole set the catalog requires.
+Both live in the repository so they do not have to be rebuilt each release.
+
+```powershell
+cd web; npm run build; cd ..
+dotnet run --project tests/MeshMessenger.Tests -- --preview 5319
+# in another shell, once:
+cd tests/preview; npm install
+node screenshots.mjs --port 5319 --out ../../screenshots
+```
+
+The awkward states are forced rather than waited for: the preview host has
+`/preview/slow/{on}` and `/preview/broken/{on}`, which the script uses for the
+loading and error screenshots, and it deletes every node at the end for the
+empty ones. Its dependencies sit outside `web/` on purpose, so they are not part
+of the build the catalog rebuilds and scans.
+
+Screenshots are never committed: the catalog's rebuild check fails on a tracked
+binary. Deliver them as a ZIP.

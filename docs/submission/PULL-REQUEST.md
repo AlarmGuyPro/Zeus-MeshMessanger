@@ -1,38 +1,125 @@
-# Pull request body — Mesh Messenger 0.4.1
+# Pull request body — Mesh Messenger 1.0.0
 
 Catalog PR title:
 
 ```text
-feat(registry): add io.github.alarmguypro.meshmessenger 0.4.1
+feat(registry): add io.github.alarmguypro.meshmessenger 1.0.0
 ```
 
 ---
 
 ## What this is
 
-Mesh Messenger puts Meshtastic and MeshCore traffic in one Zeus panel. The
-station keeps one or two LoRa nodes on Wi-Fi; Zeus reads their messages, shows
-them in a single inbox, and sends replies back out through the node a
-conversation arrived on.
+Mesh Messenger 1.0.0, a new version of a feature already in the catalog
+(0.4.1, merged in #19). The entry gains one element in its `versions` array;
+the published 0.4.1 object is untouched.
 
-The rule the whole design hangs on: **a reply always goes out on the network
-and node its conversation came from.** A MeshCore conversation is never
-answered over Meshtastic, or the other way round. If that node is offline the
-reply fails and says so, rather than silently finding another route.
+Everything in this version answers the review of #19. Thank you for it — the
+mutation run in particular found a real gap, and it is now part of the build.
 
 ## Identity
 
 | | |
 |---|---|
 | Feature ID | `io.github.alarmguypro.meshmessenger` |
-| Version | 0.4.1 |
+| Version | 1.0.0 |
 | SDK | ABI 1, minimum 1.5.0 |
 | Platforms | `any` — fully managed, no native or platform-specific files |
 | License | GPL-3.0-or-later (feature-owned `LICENSE` in the package) |
 | Source | https://github.com/AlarmGuyPro/Zeus-MeshMessanger |
-| Commit | `f4e26ca7cba194ae713a25d7b60d8fa653bcb391` |
-| Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/io.github.alarmguypro.meshmessenger-0.4.1.zip |
-| SHA-256 | `a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc` |
+| Commit | `0bda3574bb39071b868d1922ba68a3ff2fdcf7e6` |
+| Intake ZIP | https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip |
+| SHA-256 | `ea697ccf2e404a2f1fb2bf6a8ab3f98e047016bf144361cb4ec545b2ea1771ea` |
+
+## What the review asked for, and what changed
+
+**1. A MeshCore channel index that is not a real slot.** Confirmed exactly as
+described: the index was validated when a channel's *name* was displayed and
+not when it keyed a *transmitter*, so an out-of-range slot cast to a byte and
+went out on the public channel. It is now refused, by name, before anything
+is sent, and `MeshCoreNeverTransmitsOnAChannelSlotTheNodeDoesNotHave` proves
+nothing reaches the wire for slots 7, 256 and -1.
+
+**2. History in one settings value.** Rewritten. History is now one value per
+conversation plus a small index, and a save writes only what changed: an
+unchanged history writes nothing at all, one new message rewrites one
+conversation, and a forgotten conversation has its value deleted. A restart
+writes nothing, because the store remembers what is already on disk.
+Conversation values are keyed by a hash of the conversation id, so a station's
+name cannot shape a settings key. The 0.4.1 single value is read on first run,
+written back in the new layout, and removed.
+
+History is also bounded in bytes, not only in messages: 192 KB per
+conversation and 4 MB in total, each a named constant carrying its reason.
+Over either, the oldest material is dropped on purpose. The failure mode being
+designed against is the one you identified — a write that crosses the host's
+document limit and takes the already-saved history with it.
+
+**3. Unbounded peer tables, and a per-packet copy.** Both confirmed. The
+Meshtastic node map is no longer rebuilt on every packet; both tables are
+mutated in place under the lock they were already read under, and both are
+capped (300 heard-but-unsaved MeshCore stations, 600 Meshtastic stations) with
+oldest-first eviction that keeps our own node and anything favourited.
+Eviction orders by Zeus's own receive order rather than the advert's
+timestamp, since that timestamp is the sender's to set. Forgetting is logged
+and the limit is shown in the panel.
+
+**4. The mutation run.** This was the most useful finding in the set and it is
+worth being explicit about the cause: the test harness set
+`HostValidator.AllowLoopback = true` for the entire suite, because the
+simulated nodes listen on 127.0.0.x. So the refusal path that the previous
+pull request described in writing was never once exercised.
+
+Loopback is now granted per test, through `[Test(Loopback = true)]`, and only
+the eight tests that need a simulated node ask for it. Everything else runs
+with the shipped default. Six new tests in `SecurityTests.cs` cover the claims
+this PR makes: loopback refused by the validator, by name as well as by
+literal, and by the real add-node endpoint; Internet addresses refused, and so
+are addresses carrying a scheme, path, credentials or query; a node never
+followed to a non-local address; only local candidates ever probed when a node
+has moved; and a frame header claiming 60000 bytes skipped rather than
+allocated.
+
+`scripts/mutation-check.py` in the repository repeats your four mutations as an
+acceptance check. Each one now turns the suite red:
+
+```text
+baseline: 48/48 passed
+CAUGHT: allow loopback — 47/48
+CAUGHT: drop the address check when following a node — 47/48
+CAUGHT: drop the local filter on re-find candidates — 47/48
+CAUGHT: remove the frame-size cap — 47/48
+```
+
+**5 and 6. Documentation describing things that do not ship.** Fair, and ours
+to own. `options.md` is rewritten to cover only what the panel does, and it
+now ends with a list of what is deliberately absent: rooms (posts arrive and
+can be answered, but Zeus cannot log into a room), route tools, repeater and
+node health, Store & Forward, Meshtastic channel management, and any contact
+list of Zeus's own. The route-tools help page is deleted. `FEATURES.md` keeps
+its build order but says which steps shipped.
+
+The "Transmits automatically" column is gone from the options reference too.
+Once the unshipped features came out, nothing in the panel transmits on its
+own, which is a better thing to be able to state than a column of defaults.
+
+**And a correction to the #19 text.** That pull request listed "channel keys"
+among the persisted settings. That was wrong, and I corrected it in a comment
+at the time: channel keys live on the node and nowhere else — the MeshCore
+connector's `HasStoredSecrets` is `() => false`, and there is no room or
+repeater password anywhere in the feature. The capability list below is
+accurate.
+
+## Also in this version
+
+- **The Debug tab is now Logs**, with Everything / Messages / Problems
+  filters, and every message in and out is logged — the channel or station,
+  the byte count, SNR and hop count, never the text. Nothing logged an arrival
+  before, which made "the node never decrypted it" and "Zeus filed it
+  somewhere unexpected" indistinguishable from the log.
+- **The version is shown in the panel**, and it comes from the manifest Zeus
+  loaded rather than a constant in the code, so a bug report cannot quote a
+  version nothing shipped with.
 
 ## Capabilities and permissions, and why
 
@@ -41,123 +128,48 @@ Declared: `NetworkAccess`, `PersistSettings`. Permissions: `network: true`,
 
 **Network.** The feature's entire purpose is talking to LoRa nodes over the
 local network: MeshCore's companion protocol on TCP 5000, Meshtastic's on TCP
-4403. It connects only to nodes the operator configured, or to ones found by an
-explicit Scan. **Public IP addresses are refused** — `HostValidator` accepts
-only private ranges, and loopback only under a test flag that is never set in
-the shipped package. Discovery is mDNS plus a probe of 4403/5000 across private
+4403. It connects only to nodes the operator configured, or to ones found by
+an explicit Scan. **Public IP addresses are refused, and so is loopback** —
+`HostValidator` accepts only private, link-local and CGNAT ranges, and
+loopback only under a test flag whose shipped value is a constant the suite
+asserts is false. Discovery is mDNS plus a probe of 4403/5000 across private
 ranges, identity-confirmed, and it runs only on Scan, at setup, or when
-re-finding a node that moved. There are no internet calls, no update checks and
-no telemetry of any kind.
+re-finding a node that moved. There are no internet calls, no update checks
+and no telemetry of any kind.
 
-**Persisted settings.** Node addresses and identities, message history,
-per-conversation mute flags, and channel keys. These go in the plugin settings
-store, which is why there is no filesystem permission: the feature calls no
-`File` or `Directory` API at all.
+**Persisted settings.** Node addresses and identities, message history and
+per-conversation mute flags. These go in the plugin settings store, which is
+why there is no filesystem permission: the feature calls no `File` or
+`Directory` API at all. **No keys or passwords are persisted** — channel keys
+live on the node, and the feature holds no room or repeater password.
 
 **Not used:** no `[FromServices]`, no `HttpContext.RequestServices`, no
 environment variables, no reflection, no `HostDataDirectory`, no dynamic code
 loading. PureSignal is never touched, and the feature never keys a
 transmitter.
 
-## Transmit discipline
+## Local gate results
 
-This is a radio feature, so every control in the UI is labelled with whether
-pressing it puts RF on the air — "Transmits: no" in grey, "Transmits: yes" in
-amber. In 0.4.1 exactly one control transmits: **Send advert** on the Nodes
-tab, which announces the operator's own node so other stations can add it.
-Everything else — reading contacts, joining a channel, tidying the contact
-list, muting, deleting history — is either local to Zeus or a local command to
-the node over Wi-Fi.
+| Gate | Result |
+|---|---|
+| `tools/validate-package.ps1` with every expected-metadata argument | exit 0 |
+| `PackageSecurityScan scan` | **CLEAR** — 0 fail, 0 review, 2 info (the declared network use, and the ABI-1 capability note) |
+| `tools/verify-source-build.ps1 -Phase All` from a clean clone of the pinned commit | **clear** — 0 fail, 0 review |
+| `tools/validate-registry.ps1` with this entry | 24 plugins, 43 versions, exit 0 |
+| `tools/test-community-custody.ps1` | passed |
+| `tools/test-catalog-publication.ps1` | passed |
+| Feature test suite | 48/48 |
+| `scripts/mutation-check.py` | all four mutations caught |
 
-Sending a message transmits, obviously, and only ever because the operator
-pressed Send. Transmissions across nodes are serialised and spaced by a
-coordinator so two nodes don't talk over each other.
+## The 404 check, again
 
-The feature never changes a node's radio settings.
-
-## UI styling contract
-
-- Everything is scoped under the feature root class
-  `io-github-alarmguypro-meshmessenger`, with prefixed secondary names.
-- Colors come only from the public token subset. There is no raw hex, rgb, hsl
-  or named color anywhere in the feature CSS.
-- State colors are used semantically: `--tx` only for transmit, `--amber` for
-  warnings, `--ok` for confirmed healthy, `--accent` for selection and focus.
-  No state is signalled by color alone — each carries a word or a symbol too.
-- Dark and light themes, normal and narrow widths, and 200% scaling are all in
-  the attached screenshots.
-- Loading, empty, error, disconnected and unavailable states are all explicit
-  and are all shown.
-- Keyboard focus stays visible; every control has an accessible name; no action
-  is hover-only.
-- All backend work goes through `callBackend`. Polling timers are cleared on
-  unmount.
+`downloadUrl` points at Zeus-SDR and will 404 until a maintainer mirrors the
+package into custody. CONTRIBUTING says contributors are not expected to make
+the HTTPS/checksum check pass; the package the scanners read is
+`source.package`, on this feature's own repository, and that URL is live.
 
 ## Screenshots
 
-Attached, 21 images:
-
-| | |
-|---|---|
-| 01–05 | Dark theme: inbox, a selected direct thread with a failed send, the Nodes tab, Settings, Debug |
-| 06–08 | Light theme: inbox, a channel thread, Nodes |
-| 09–10 | Narrow width |
-| 11–12 | 200% display scaling |
-| 13–14 | Visible keyboard focus |
-| 15 | Loading |
-| 16 | Backend error |
-| 17–18 | A node that can't be reached, on Nodes and Debug |
-| 19–21 | Empty states with no nodes configured |
-
-Screenshot 17 is the densest piece of review evidence: a disconnected node in
-the status bar, the amber full-contact-list warning, the amber "Transmits: yes"
-label beside Send advert, and the channel and contact management below it.
-
-## Local checks
-
-All run from the catalog repository on Linux against the exact submitted ZIP
-and a fresh clone of commit `f4e26ca`:
-
-| Check | Result |
-|---|---|
-| `dotnet build Zeus.CommunityFeatures.slnx -c Release` | 0 warnings, 0 errors |
-| `ajv validate` — registry, template manifest, and this feature's `zeus-build.json` | all valid |
-| `tools/validate-sdk-boundary.ps1` | 21 GPL public-contract SDK files validated |
-| `tools/test-package-validator.ps1` | path-safety regression tests passed |
-| `tools/validate-registry.ps1` | 23 plugins, 41 versions validated |
-| `tools/validate-package.ps1` with id, version, ABI, min version and schema | exit 0 |
-| `templates/hello-world/build-package.ps1` + validate | exit 0 |
-| `tools/verify-source-build.ps1` from a clean clone | **clear** |
-| Package security scan (`PackageSecurityScan scan`) | **CLEAR — 0 fail, 0 review, 2 info** |
-| Feature's own test suite | 32/32 passed |
-
-The two info findings are the expected ones: the socket and networking types
-the connectors use, and the manifest capability disclosure.
-
-The package ships a **single assembly**. The mesh protocol code lives under
-`src/MeshMessenger/Mesh/` inside the plugin project rather than in a project of
-its own, so there is no second DLL for a reviewer to chase.
-
-## Provenance
-
-All code in this feature is original work for it, except:
-
-- `src/MeshMessenger/Mesh/Discovery/` (`Mdns.cs`, `Ipv4Network.cs`) — original
-  implementations written against the published mDNS and IPv4 specifications,
-  listed in `THIRD_PARTY_NOTICES.md`.
-- `sdk/Zeussdr.Zeus.Plugins.Contracts/` — the vendored public SDK snapshot,
-  unmodified.
-
-The MeshCore and Meshtastic wire formats were implemented from each project's
-public firmware source and protocol documentation. No Zeus private source,
-host implementation detail, DSP or radio protocol logic was read, copied or
-relied on.
-
-## Testing
-
-Tested against real hardware as well as the simulated nodes in the test suite:
-two Heltec V4 boards, one running MeshCore companion Wi-Fi firmware v1.17.1 and
-one running Meshtastic 2.7.26, both on Wi-Fi alongside a Windows Zeus host.
-Direct messages, channel traffic, contact management and channel join/leave
-were exercised on the air. Node discovery over mDNS was confirmed to find the
-Meshtastic node without a typed address.
+Attached: dark and light, normal and narrow widths, 200% scaling, keyboard
+focus, and the loading, empty, error, disconnected and unavailable states,
+across all four tabs.

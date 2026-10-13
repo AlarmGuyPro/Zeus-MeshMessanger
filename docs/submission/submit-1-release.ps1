@@ -12,16 +12,16 @@
   Nothing is uploaded until you confirm.
 
 .EXAMPLE
-  pwsh ./submit-1-release.ps1 -ZipPath "$HOME\Downloads\io.github.alarmguypro.meshmessenger-0.4.1.zip"
+  pwsh ./submit-1-release.ps1 -ZipPath "$HOME\Downloads\io.github.alarmguypro.meshmessenger-1.0.0.zip"
 #>
 [CmdletBinding()]
 param(
-    # The ZIP to publish. Use the one from chat, or builds/v0.4.1/ — never a fresh rebuild.
+    # The ZIP to publish. Use the one from chat, or builds/v1.0.0/ — never a fresh rebuild.
     [Parameter(Mandatory)][string] $ZipPath,
     [string] $Repo = 'AlarmGuyPro/Zeus-MeshMessanger',
-    [string] $Tag = 'v0.4.1',
-    [string] $Commit = 'f4e26ca7cba194ae713a25d7b60d8fa653bcb391',
-    [string] $ExpectedHash = 'a854b549ce4717da09a16558cf533584771ae9c60649347de2c9b63ab28c53fc',
+    [string] $Tag = 'v1.0.0',
+    [string] $Commit = '0bda3574bb39071b868d1922ba68a3ff2fdcf7e6',
+    [string] $ExpectedHash = 'ea697ccf2e404a2f1fb2bf6a8ab3f98e047016bf144361cb4ec545b2ea1771ea',
     # Skip the confirmation prompt.
     [switch] $Force
 )
@@ -78,7 +78,7 @@ That is not the archive the catalog entry describes.
 This is almost always because the packaging script was run again: a rebuild
 produces a working but byte-different assembly, so the hash changes. Use the
 archive that was delivered in chat, or the copy on the repository's 'builds'
-branch under v0.4.1/. Do not rebuild it.
+branch under v1.0.0/. Do not rebuild it.
 "@
 }
 Write-Host '  Hash matches the catalog entry.' -ForegroundColor Green
@@ -90,7 +90,7 @@ if ($LASTEXITCODE -eq 0) {
 A release tagged $Tag already exists on $Repo.
 
 Published bytes must never be replaced. If the package has changed, build a new
-version (0.4.2), get a new hash, and submit that instead.
+version (1.0.1), get a new hash, and submit that instead.
 "@
 }
 
@@ -111,8 +111,8 @@ if (-not $Force) {
 gh release create $Tag $zip `
     --repo $Repo `
     --target $Commit `
-    --title 'Mesh Messenger 0.4.1' `
-    --notes 'Intake release for the Zeus community catalog. Built from f4e26ca7cba194ae713a25d7b60d8fa653bcb391.'
+    --title 'Mesh Messenger 1.0.0' `
+    --notes 'Intake release for the Zeus community catalog. Built from 0bda3574bb39071b868d1922ba68a3ff2fdcf7e6.'
 if ($LASTEXITCODE -ne 0) { Fail 'gh release create failed. The message above says why.' }
 
 $url = "https://github.com/$Repo/releases/download/$Tag/$(Split-Path -Leaf $zip)"
