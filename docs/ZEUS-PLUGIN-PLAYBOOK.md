@@ -306,6 +306,11 @@ every time and in a plain Chromium never, because plain Chromium follows the spe
 The preview harness now renders under simulated host quirks
 (`tests/preview/regression.mjs`), and that file is the right home for every future one.
 
+One more, about the rebuild check itself: **run it against a freshly cloned tree every
+time.** The check builds inside the directory you hand it, so a second run over the same
+directory finds the first run's `obj/` and fails with "Committed build output directory is
+not allowed" — a message about your repository, caused entirely by your own retry.
+
 And a process note: trust the operator's description over your own reproduction. The report
 was "clicking a channel crashes Zeus", which was exact. Two rounds were spent doubting it
 because the logs showed a tidy restart and the panel was clean under test.
