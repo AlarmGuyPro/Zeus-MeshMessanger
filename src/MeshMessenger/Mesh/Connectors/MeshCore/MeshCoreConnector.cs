@@ -347,11 +347,28 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 // Contact details changed; refresh on the next quiet moment.
                 _ = RefreshContactsSoonAsync();
                 break;
+            case PushLogRxData:
+                // The firmware's packet log, sent continuously on a busy mesh. Zeus has no
+                // use for it and it would drown everything else in the Logs tab.
+                break;
             default:
-                Log(LogLevel.Info, $"The node sent push code 0x{f[0]:x2} ({f.Length} bytes), which Zeus doesn't use.");
+                Log(LogLevel.Info,
+                    $"The node sent {NameOfPush(f[0])} ({f.Length} bytes), which Zeus doesn't use.");
                 break;
         }
     }
+
+    /// <summary>Names the pushes we know of, so the log says what arrived rather than a number.</summary>
+    private static string NameOfPush(byte code) => code switch
+    {
+        PushLoginSuccess => "a login success",
+        PushLoginFail => "a login failure",
+        PushStatusResponse => "a repeater status reply",
+        PushLogRxData => "its packet log",
+        PushTraceData => "trace data",
+        PushPathDiscoveryResponse => "a path discovery reply",
+        _ => $"push code 0x{code:x2}",
+    };
 
     private int _refreshQueued;
 
@@ -423,9 +440,16 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             Log(LogLevel.Info, $"Read {_contacts.Count} contact{(_contacts.Count == 1 ? "" : "s")} from the node.");
             if (_maxContacts > 0 && _contacts.Count >= _maxContacts)
             {
-                Log(LogLevel.Warning,
-                    $"The node's contact list is full ({_contacts.Count} of {_maxContacts}). It can't learn new stations, " +
-                    "so direct messages to a station it hasn't already saved will fail until contacts are removed.");
+                // A full list only matters when the node cannot make room. With recycling on
+                // it drops its oldest non-favourite contact and carries on, so warning about
+                // it is both wrong and alarming — the node had just saved a new station.
+                var recycling = _autoAddConfig is { } cfg && (cfg & AutoAddOverwriteOldest) != 0;
+                Log(recycling ? LogLevel.Info : LogLevel.Warning, recycling
+                    ? $"The node's contact list is full ({_contacts.Count} of {_maxContacts}). Recycling is on, so it " +
+                      "drops its oldest non-favourite contact to make room for a new station."
+                    : $"The node's contact list is full ({_contacts.Count} of {_maxContacts}). It can't learn new stations, " +
+                      "so direct messages to a station it hasn't already saved will fail until contacts are removed. " +
+                      "Turn on \"Recycle the oldest contact when the list is full\" on the Nodes tab, or remove some.");
             }
         }
         RaiseChanged();
