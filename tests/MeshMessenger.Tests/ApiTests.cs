@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 using MeshMessenger.Connectors.MeshCore;
+using MeshMessenger.Services;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
@@ -98,8 +99,10 @@ public static class ApiTests
             await Assert.Eventually(() => host.GetAsync($"conversations/{Uri.EscapeDataString(conversationId)}/messages").Result
                 .AsArray().Any(m => m!["status"]!.GetValue<string>() == "delivered"), "delivered");
 
-            // Wait for the history to be saved.
-            await Assert.Eventually(() => settings.Values.ContainsKey("history.v1"), "history saved", 8000);
+            // Wait for the history to be saved: an index, and a value for the conversation.
+            await Assert.Eventually(() => settings.Values.ContainsKey(SettingsStore.HistoryIndexKey), "history index saved", 8000);
+            Assert.True(settings.Values.ContainsKey(SettingsStore.KeyFor(conversationId)), "the conversation's own value saved");
+            Assert.False(settings.Values.ContainsKey(SettingsStore.LegacyHistoryKey), "nothing written to the old single value");
         }
 
         await using (var again = await PluginHost.StartAsync(new FakePluginContext { Settings = settings }))

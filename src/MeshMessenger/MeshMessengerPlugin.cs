@@ -29,6 +29,16 @@ public sealed class MeshMessengerPlugin : IZeusPlugin, IBackendPlugin
         if (history is not null)
         {
             store.Restore(history);
+            if (history.Version < 2)
+            {
+                // Loaded from the single-value layout. Writing it back per conversation and
+                // then dropping the old value is the whole migration.
+                await _settings.SaveHistoryAsync(store.Snapshot(), ct).ConfigureAwait(false);
+                await _settings.DiscardLegacyHistoryAsync(ct).ConfigureAwait(false);
+                context.Logger.LogInformation(
+                    "Message history moved to one value per conversation ({Count} conversations, {Bytes} bytes)",
+                    history.Conversations.Count, store.Bytes);
+            }
         }
         store.Changed += () => Interlocked.Exchange(ref _dirty, 1);
 
@@ -62,7 +72,12 @@ public sealed class MeshMessengerPlugin : IZeusPlugin, IBackendPlugin
         if (Interlocked.Exchange(ref _dirty, 0) == 0 || _nodes is null || _settings is null) return;
         try
         {
-            await _settings.SaveHistoryAsync(_nodes.Store.Snapshot(), ct).ConfigureAwait(false);
+            var report = await _settings.SaveHistoryAsync(_nodes.Store.Snapshot(), ct).ConfigureAwait(false);
+            if (!report.Quiet)
+            {
+                _context?.Logger.LogDebug("History: wrote {Written}, removed {Deleted}, {Bytes} bytes held",
+                    report.Written, report.Deleted, report.Bytes);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

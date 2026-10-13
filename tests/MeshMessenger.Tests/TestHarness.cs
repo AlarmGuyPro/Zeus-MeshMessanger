@@ -66,12 +66,16 @@ public sealed class MemorySettings : IPluginSettings
 {
     public ConcurrentDictionary<string, object?> Values { get; } = new();
 
+    /// <summary>How many times each key has been written, so write amplification is testable.</summary>
+    public ConcurrentDictionary<string, int> Writes { get; } = new();
+
     public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) =>
         Task.FromResult(Values.TryGetValue(key, out var v) ? (T?)v : default);
 
     public Task SetAsync<T>(string key, T value, CancellationToken ct = default)
     {
         Values[key] = value;
+        Writes.AddOrUpdate(key, 1, (_, n) => n + 1);
         return Task.CompletedTask;
     }
 
