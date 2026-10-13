@@ -67,7 +67,8 @@ public sealed record LogEntryDto(DateTimeOffset At, string Level, string Text);
 public sealed record NodeDebugDto(
     string Id, string Name, string Network, string State, string? Detail, string Host, int Port,
     string? Identity, SelfDto? Self, int Contacts, int ContactsHeardOnly, int? ContactCapacity, int Channels,
-    bool CanAnnounce, bool? RecycleOldestWhenFull, IReadOnlyList<LogEntryDto> Activity);
+    bool CanAnnounce, bool? RecycleOldestWhenFull, IReadOnlyList<LogEntryDto> Activity,
+    int? RememberedPeerLimit = null);
 
 public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnlyList<NodeDebugDto> Nodes);
 
@@ -377,7 +378,8 @@ internal static class Endpoints
                 c?.Self is { } s ? new SelfDto(s.Identity, s.Name, s.ShortName, s.Firmware, s.Model, s.RadioSummary) : null,
                 peers.Count(p => p.SavedOnNode), peers.Count(p => !p.SavedOnNode), c?.PeerCapacity,
                 c?.Channels.Count ?? 0, c?.CanAnnounce ?? false, c?.RecycleOldestWhenFull,
-                (c?.Activity ?? []).Select(a => new LogEntryDto(a.At, Lower(a.Level), a.Text)).ToArray()));
+                (c?.Activity ?? []).Select(a => new LogEntryDto(a.At, Lower(a.Level), a.Text)).ToArray(),
+                c is null || c.RememberedPeerLimit == int.MaxValue ? null : c.RememberedPeerLimit));
         }
         return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
     }

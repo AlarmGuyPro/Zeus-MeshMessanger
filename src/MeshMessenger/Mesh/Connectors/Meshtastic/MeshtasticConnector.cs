@@ -25,7 +25,20 @@ public sealed class MeshtasticConnector : MeshConnectorBase
     private readonly ConcurrentDictionary<uint, PendingAck> _awaitingAck = new();
     private Stream? _stream;
     private uint _myNum;
-    private Dictionary<uint, NodeRecord> _nodes = [];
+    /// <summary>
+    /// Stations this node has heard of. Mutated in place under <see cref="_gate"/> — it used
+    /// to be copied whole on every packet, which made packet handling cost grow with the
+    /// number of stations ever seen. On an MQTT-bridged mesh that is thousands.
+    /// </summary>
+    private readonly Dictionary<uint, NodeRecord> _nodes = [];
+
+    /// <summary>
+    /// How many stations are remembered. A mesh bridged to MQTT delivers traffic from far
+    /// outside radio range, so this table would otherwise grow for as long as Zeus runs.
+    /// When it is full the least recently heard station is forgotten, except one the
+    /// operator has favourited on the node.
+    /// </summary>
+    public const int MaxKnownNodes = 600;
     private SortedDictionary<int, ChannelRecord> _channels = [];
     private LoraConfig? _lora;
     private string? _firmware;
@@ -42,6 +55,8 @@ public sealed class MeshtasticConnector : MeshConnectorBase
     public override int DefaultPort => Port4403;
 
     public override int MaxTextBytes(ConversationKind kind) => TextLimitBytes;
+
+    public override int RememberedPeerLimit => MaxKnownNodes;
 
     public override IReadOnlyList<PeerInfo> Peers
     {
@@ -193,7 +208,11 @@ public sealed class MeshtasticConnector : MeshConnectorBase
                     lock (_gate) _myNum = my.NodeNum;
                     break;
                 case NodeInfoMsg ni:
-                    lock (_gate) _nodes = new Dictionary<uint, NodeRecord>(_nodes) { [ni.Node.Num] = ni.Node };
+                    lock (_gate)
+                    {
+                        _nodes[ni.Node.Num] = ni.Node;
+                        TrimNodes();
+                    }
                     if (ni.Node.Num == _myNum) UpdateSelf();
                     RaiseChanged();
                     break;
@@ -211,7 +230,9 @@ public sealed class MeshtasticConnector : MeshConnectorBase
                     break;
                 case ConfigComplete cc when cc.Id == configId:
                     UpdateSelf();
-                    Log(LogLevel.Info, $"Configuration received: {_nodes.Count} node(s) and {Channels.Count} channel(s) known.");
+                    int known;
+                    lock (_gate) known = _nodes.Count;
+                    Log(LogLevel.Info, $"Configuration received: {known} node(s) and {Channels.Count} channel(s) known.");
                     configDone.TrySetResult();
                     break;
                 case PacketMsg pm:
@@ -220,6 +241,34 @@ public sealed class MeshtasticConnector : MeshConnectorBase
                 case Rebooted:
                     throw new IOException("The node rebooted.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Forgets the least recently heard stations once the table is full. Called with
+    /// <see cref="_gate"/> held. Our own node and anything favourited on the node are kept,
+    /// and a station with no last-heard time counts as the oldest.
+    /// </summary>
+    private void TrimNodes()
+    {
+        if (_nodes.Count <= MaxKnownNodes) return;
+        var expendable = _nodes.Values
+            .Where(n => n.Num != _myNum && !n.Favorite)
+            .OrderBy(n => n.LastHeard ?? DateTimeOffset.MinValue)
+            .Select(n => n.Num)
+            .ToList();
+        var forgotten = 0;
+        foreach (var num in expendable)
+        {
+            if (_nodes.Count <= MaxKnownNodes) break;
+            _nodes.Remove(num);
+            forgotten++;
+        }
+        if (forgotten > 0)
+        {
+            Log(LogLevel.Info,
+                $"Forgot {forgotten} station{(forgotten == 1 ? "" : "s")} not heard from recently; " +
+                $"Zeus remembers {MaxKnownNodes}. The node's own list is unchanged.");
         }
     }
 
@@ -268,7 +317,8 @@ public sealed class MeshtasticConnector : MeshConnectorBase
                     }
                     catch (FormatException) { }
                 }
-                _nodes = new Dictionary<uint, NodeRecord>(_nodes) { [p.From] = updated };
+                _nodes[p.From] = updated;
+                TrimNodes();
             }
         }
 

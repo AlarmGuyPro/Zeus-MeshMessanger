@@ -31,7 +31,30 @@ public sealed class MeshCoreConnector : MeshConnectorBase
     private Dictionary<string, Contact> _contacts = new(StringComparer.OrdinalIgnoreCase); // full key hex -> contact
     // Heard (PUSH_NEW_ADVERT) but not saved on the node, e.g. when the node is set to add
     // contacts manually. The node can't exchange direct messages with these until saved.
-    private Dictionary<string, (Contact Contact, byte[] Frame)> _heard = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Stations heard advertising that the node did not save as contacts, kept so the
+    /// operator can message one (saving it on the node first). Mutated in place under
+    /// <see cref="_gate"/>.
+    /// </summary>
+    private readonly Dictionary<string, HeardStation> _heard = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A station heard advertising, with the advert frame kept so it can be saved on the
+    /// node later. <see cref="Seq"/> is when Zeus heard it, counted locally: the advert
+    /// carries the sender's own clock, which is theirs to set, so it must not decide which
+    /// station is forgotten first.
+    /// </summary>
+    private readonly record struct HeardStation(Contact Contact, byte[] Frame, long Seq);
+
+    private long _heardSeq;
+
+    /// <summary>
+    /// How many heard-but-unsaved stations are remembered. Every advert on the air adds one,
+    /// and a busy mesh adverts constantly, so without a cap this grows for as long as Zeus
+    /// runs. The oldest advert is forgotten first; the node's own contact list is untouched,
+    /// and a station that adverts again comes straight back.
+    /// </summary>
+    public const int MaxHeardStations = 300;
     private int _maxContacts;
     private byte? _autoAddConfig;
     private byte _autoAddMaxHops;
@@ -269,10 +292,8 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 Log(LogLevel.Receive, $"Heard an advert from \"{contact.Name}\" ({Short(Convert.ToHexString(contact.PublicKey))}). The node has not saved it as a contact.");
                 lock (_gate)
                 {
-                    _heard = new Dictionary<string, (Contact, byte[])>(_heard, StringComparer.OrdinalIgnoreCase)
-                    {
-                        [Convert.ToHexString(contact.PublicKey)] = (contact, f.ToArray()),
-                    };
+                    _heard[Convert.ToHexString(contact.PublicKey)] = new HeardStation(contact, f.ToArray(), ++_heardSeq);
+                    TrimHeard();
                 }
                 RaiseChanged();
                 break;
@@ -633,6 +654,8 @@ public sealed class MeshCoreConnector : MeshConnectorBase
 
     public override int? PeerCapacity { get { lock (_gate) return _maxContacts > 0 ? _maxContacts : null; } }
 
+    public override int RememberedPeerLimit => MaxHeardStations;
+
     public override bool? RecycleOldestWhenFull
     {
         get { lock (_gate) return _autoAddConfig is { } c ? (c & AutoAddOverwriteOldest) != 0 : null; }
@@ -895,7 +918,35 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         return _contacts.Values.FirstOrDefault(x => Convert.ToHexString(x.PublicKey).StartsWith(peer, StringComparison.OrdinalIgnoreCase));
     }
 
-    private (Contact Contact, byte[] Frame)? FindHeard(string peer)
+    /// <summary>
+    /// Forgets the stations heard longest ago once the table is full. Called with
+    /// <see cref="_gate"/> held. One the node has since saved as a contact goes first,
+    /// because the contact itself is the record that matters.
+    /// </summary>
+    private void TrimHeard()
+    {
+        if (_heard.Count <= MaxHeardStations) return;
+        var expendable = _heard
+            .OrderBy(h => _contacts.ContainsKey(h.Key) ? 0 : 1)
+            .ThenBy(h => h.Value.Seq)
+            .Select(h => h.Key)
+            .ToList();
+        var forgotten = 0;
+        foreach (var key in expendable)
+        {
+            if (_heard.Count <= MaxHeardStations) break;
+            _heard.Remove(key);
+            forgotten++;
+        }
+        if (forgotten > 0)
+        {
+            Log(LogLevel.Info,
+                $"Forgot {forgotten} station{(forgotten == 1 ? "" : "s")} heard but not saved; Zeus remembers " +
+                $"{MaxHeardStations}. They come back when they advert again, and the node's contacts are unchanged.");
+        }
+    }
+
+    private HeardStation? FindHeard(string peer)
     {
         if (_heard.TryGetValue(peer, out var h)) return h;
         foreach (var (key, value) in _heard)

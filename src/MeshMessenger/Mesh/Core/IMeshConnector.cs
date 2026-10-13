@@ -55,6 +55,12 @@ public interface IMeshConnector : IAsyncDisposable
     /// <summary>How many contacts the node can hold, when the firmware reports it. A full list can't learn new stations.</summary>
     int? PeerCapacity { get; }
 
+    /// <summary>
+    /// How many stations Zeus itself remembers for this node, beyond what the node holds.
+    /// Shown in the Logs tab so a table at its limit is visible rather than silent.
+    /// </summary>
+    int RememberedPeerLimit { get; }
+
     /// <summary>Whether the node recycles its oldest contact when the list is full; null when the node has no such setting.</summary>
     bool? RecycleOldestWhenFull { get; }
 
