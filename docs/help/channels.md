@@ -43,25 +43,19 @@ lists them and lets you read and post, but doesn't add or remove them.
 ## Rooms (MeshCore only)
 
 A **room server** is a MeshCore node that acts as a small shared message
-board. Members log in with the room's password; the server keeps the last
-32 posts and delivers each new post to every member, including posts made
-while a member's node was off.
+board: members log in with the room's password, and the server delivers each
+new post to every member.
 
-Use a room as the **"leave a message for the shack"** place: anyone in the
-room can post, and your Zeus node collects the posts the next time it logs
-in. Every member reads every post, so it's a notice board, not private mail.
+**Joining a room is not in this version.** If your node is already a member of
+a room — because it was logged in with the MeshCore app or meshcore-cli — the
+posts it receives appear in Zeus as their own conversation, and you can post
+back to it. What Zeus cannot do is log in, so:
 
-Things to know:
+- It will not collect the posts you missed while your node was off. A room
+  stops sending to a member after three failed attempts, and only a fresh
+  login restarts it; use the MeshCore app for that.
+- There is no room password anywhere in the panel. Mesh Messenger never asks
+  for a room's or a repeater's password.
 
-- The room keeps posts in memory: if the room server reboots or loses power,
-  its posts are gone.
-- Posts are up to 151 bytes. A room has up to 20 members.
-- If the room can't reach your node 3 times in a row (your node was off or
-  out of range), it stops trying until your node logs in again. That's what
-  **Rejoin automatically when Zeus connects** is for. It's off by default
-  because it transmits a login each time Zeus connects; without it, press
-  **Rejoin** yourself after an outage.
-- The password is the room's member password. Mesh Messenger never asks for
-  a room's or repeater's admin password.
-- Setting up a room server (its name, password, whether guests can read) is
-  done with the MeshCore tools, not in Zeus.
+Setting up a room server — its name, password, whether guests can read — is
+done with the MeshCore tools, and so is logging into one.

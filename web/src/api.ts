@@ -58,6 +58,8 @@ export interface StatusDto {
   scanRanges: string[];
   historyPerConversation: number;
   version: number;
+  /** The feature's own version, as Zeus loaded it from the manifest. */
+  pluginVersion?: string;
 }
 
 export interface PeerDto {
@@ -210,12 +212,21 @@ export interface NodeDebugDto {
   channels: number;
   canAnnounce: boolean;
   activity: LogEntryDto[];
+  /** How many stations Zeus itself remembers for this node, when it caps them. */
+  rememberedPeerLimit?: number | null;
+}
+
+export interface HistoryDto {
+  conversations: number;
+  bytes: number;
+  budget: number;
 }
 
 export interface DebugDto {
   at: string;
   pluginVersion: string;
   nodes: NodeDebugDto[];
+  history?: HistoryDto | null;
 }
 
 export interface ActionResultDto {

@@ -1,22 +1,47 @@
 # Finding and fixing problems
 
-## The Debug tab
+## The Logs tab
 
-**Debug** shows what each node and Zeus have actually done: connects, commands
-sent to the node, its replies, acknowledgements and errors, newest first. It
-also shows each node's firmware, model, radio settings and how many contacts
-and channels it has.
+**Logs** shows what each node and Zeus have actually done: connects, commands
+sent to the node, its replies, the channels the node holds, every message in
+and out, adverts heard, acknowledgements and errors, newest first. It also
+shows each node's firmware, model, radio settings and how many contacts and
+channels it has.
 
-- **Message text is never logged.** The log records that a message of N bytes
-  was sent to a station, not what it said.
+- **Message text is never logged.** A line records that a message of N bytes
+  arrived on a named channel, or went out to a station — never what it said.
 - The log is kept in memory only. It starts empty each time Zeus opens, and
   nothing is written to disk.
-- **Search the log** filters the lines; try `advert`, `ack` or `failed`.
-- **Copy all** puts everything on screen on the clipboard. Paste it into a bug
-  report — it is the single most useful thing to include.
+- **Everything / Messages / Problems** narrows a busy log: *Messages* keeps
+  only what went out and what came in, *Problems* only warnings and errors.
+- **Search the log** filters the lines; try `advert`, `ack`, `channel` or
+  `failed`.
+- **Copy all** puts the whole log on the clipboard, whatever is being shown.
+  Paste it into a bug report — it is the single most useful thing to include.
 
 Reading the log: `TX` is something Zeus asked the node to transmit, `RX` is
 something the node reported hearing, `!` is a warning and `✕` an error.
+
+The tab also shows how much history Zeus is holding against its own budget.
+Past that budget the conversations heard from longest ago are forgotten, so
+history can never grow until a save fails.
+
+### Was it received, or did Zeus lose it?
+
+Every arrival is logged, which splits that question cleanly. Send a message on
+a channel from another station and look for a line like
+
+```text
+RX  Channel 1 ("#Test"): received 24 bytes, SNR 7.5 dB, 2 hops.
+```
+
+If it is there, the node decrypted the message and Zeus filed it; if the
+conversation looks empty, the fault is in Zeus. If there is no such line, the
+message never reached the node in a form it could read — on a channel that
+almost always means the two ends do not hold the same key. Channel names are
+case-sensitive, and a `#name` channel's key is derived from the name exactly as
+typed, so `#test` and `#Test` are two different channels that cannot hear each
+other.
 
 ## A message says it wasn't sent
 

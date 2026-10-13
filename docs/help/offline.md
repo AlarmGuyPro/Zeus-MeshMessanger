@@ -25,15 +25,17 @@ delivered"), and channel messages are simply not heard.
 
 What can help:
 
-- A **MeshCore room** (see [Channels and rooms](channels-and-rooms.md)) keeps
-  the last 32 posts and delivers the ones you missed when your node rejoins.
-- A **Meshtastic Store & Forward** server on your mesh can replay recent
-  messages if you turn on *Ask Store & Forward for missed messages on
-  connect* (see [options](options.md)).
+- A **MeshCore room** (see [Channels](channels.md)) keeps the last 32 posts
+  and delivers the ones a member missed when that member logs in again. Zeus
+  cannot log into a room in this version, so collecting those posts means
+  logging in with the MeshCore app; once your node has them, they appear in
+  Zeus.
+- A **Meshtastic Store & Forward** server on your mesh holds recent messages,
+  but Zeus does not ask one for them in this version.
 - A **Mesh Gateway** (planned, optional): a small always-on computer such as
   a Raspberry Pi that holds thousands of messages on disk.
 
 ## When Zeus restarts
 
-Messages Zeus has already shown are kept across restarts (up to *History to
-keep* per conversation).
+Messages Zeus has already shown are kept across restarts (up to *Messages kept per
+conversation*, and within the size budget in the [options reference](options.md)).

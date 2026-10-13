@@ -184,6 +184,15 @@ ${e("tab")} {
   cursor: pointer;
 }
 ${e("tab--on")} { color: var(--fg-0); border-bottom-color: var(--accent); }
+${e("version")} {
+  margin-left: auto;
+  align-self: center;
+  padding: 0 8px;
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
 ${e("pane")} { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 ${e("card")} { padding: 12px; border: 1px solid var(--panel-border); border-radius: var(--r-md); background: var(--bg-2); display: flex; flex-direction: column; gap: 8px; }
 ${e("card-head")} { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

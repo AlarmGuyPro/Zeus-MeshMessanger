@@ -392,6 +392,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             _contacts = list.Where(c => c.Kind != PeerKind.Unknown && c.PublicKey.Any(b => b != 0))
                 .GroupBy(c => Convert.ToHexString(c.PublicKey), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
+            Log(LogLevel.Info, $"Read {_contacts.Count} contact{(_contacts.Count == 1 ? "" : "s")} from the node.");
             if (_maxContacts > 0 && _contacts.Count >= _maxContacts)
             {
                 Log(LogLevel.Warning,
@@ -417,18 +418,35 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                 break; // past the last slot
             }
         }
-        lock (_gate) _slots = slots;
+        string summary;
+        lock (_gate)
+        {
+            _slots = slots;
+            summary = slots.Count(s => !s.IsEmpty) == 0
+                ? "no channels"
+                : string.Join(", ", slots.Where(s => !s.IsEmpty)
+                    .Select(s => $"{s.Index}=\"{(s.Name.Length > 0 ? s.Name : $"Channel {s.Index}")}\" ({KindOf(s).ToString().ToLowerInvariant()})"));
+        }
+        Log(LogLevel.Info, $"Channels on the node: {summary}.");
         RaiseChanged();
     }
 
     private async Task DrainMessagesAsync(bool queuedWhileAway, CancellationToken ct)
     {
+        var drained = 0;
         for (var n = 0; n < 1000; n++) // the node's queue holds at most a few hundred
         {
             var f = await CommandAsync(SyncNextMessage(),
                 c => c is RespNoMoreMessages or RespContactMsgRecv or RespContactMsgRecvV3 or RespChannelMsgRecv or RespChannelMsgRecvV3 or 27,
                 ct).ConfigureAwait(false);
-            if (f[0] == RespNoMoreMessages) return;
+            if (f[0] == RespNoMoreMessages)
+            {
+                if (drained > 1)
+                {
+                    Log(LogLevel.Receive, $"Fetched {drained} messages the node was holding.");
+                }
+                return;
+            }
             var received = ParseReceived(f);
             if (received is null)
             {
@@ -438,6 +456,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
                     $"The node handed Zeus a message frame it couldn't read (code {f[0]}, {f.Length} bytes), so it was dropped.");
                 continue;
             }
+            drained++;
             Deliver(received, queuedWhileAway);
         }
     }

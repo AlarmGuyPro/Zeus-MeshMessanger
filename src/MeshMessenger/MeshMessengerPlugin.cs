@@ -112,5 +112,6 @@ public sealed class MeshMessengerPlugin : IZeusPlugin, IBackendPlugin
         _context = null;
     }
 
-    public void MapEndpoints(IEndpointRouteBuilder endpoints) => Endpoints.Map(endpoints, () => _nodes);
+    public void MapEndpoints(IEndpointRouteBuilder endpoints) =>
+        Endpoints.Map(endpoints, () => _nodes, _context?.Manifest.Version ?? "");
 }

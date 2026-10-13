@@ -148,6 +148,11 @@ Deliberately **not** in Mesh Messenger:
 
 ## Build order
 
+Steps 1 to 4 and 6 ship in 1.0. Of step 5 only reading and posting to a room
+ship — Zeus cannot log into one — and steps 7 and 8 do not ship at all. This
+list is the plan, not a description of the panel: for what actually ships read
+[help/options.md](help/options.md), which ends with what is absent.
+
 1. Node configuration in the panel (milestone 2 in DESIGN.md).
 2. Message persistence.
 3. Both connectors: connect, handshake, messages, delivery status, reception

@@ -20,7 +20,8 @@ public sealed record NodeDto(
     int MaxDirectTextBytes, int MaxChannelTextBytes, IReadOnlyList<ChannelDto> Channels, int PeerCount,
     int? PeerCapacity, bool? RecycleOldestWhenFull, bool CanAnnounce, bool CanEditChannels);
 
-public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<string> ScanRanges, int HistoryPerConversation, long Version);
+public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<string> ScanRanges, int HistoryPerConversation,
+    long Version, string PluginVersion = "");
 
 public sealed record PeerDto(
     string Id, string Name, string? ShortName, string Kind, DateTimeOffset? LastHeard, double? Snr, int? Hops,
@@ -70,7 +71,11 @@ public sealed record NodeDebugDto(
     bool CanAnnounce, bool? RecycleOldestWhenFull, IReadOnlyList<LogEntryDto> Activity,
     int? RememberedPeerLimit = null);
 
-public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnlyList<NodeDebugDto> Nodes);
+public sealed record DebugDto(DateTimeOffset At, string PluginVersion, IReadOnlyList<NodeDebugDto> Nodes,
+    HistoryDto? History = null);
+
+/// <summary>How much history Zeus is holding, against the budget it keeps itself inside.</summary>
+public sealed record HistoryDto(int Conversations, long Bytes, long Budget);
 
 public sealed record AnnounceRequest(bool? Flood);
 
@@ -93,8 +98,15 @@ public sealed record CleanupRequest(bool? Repeaters, int? NotHeardDays, bool? Pr
 /// </summary>
 internal static class Endpoints
 {
-    public static void Map(IEndpointRouteBuilder e, Func<NodeManager?> nodes)
+    /// <summary>
+    /// The version, taken from the manifest Zeus loaded. <c>plugin.json</c> is the one place
+    /// it is written down; nothing here keeps a copy of it to fall out of step.
+    /// </summary>
+    private static string _pluginVersion = "";
+
+    public static void Map(IEndpointRouteBuilder e, Func<NodeManager?> nodes, string pluginVersion = "")
     {
+        _pluginVersion = pluginVersion;
         // ---------------------------------------------------------------- status & nodes
         e.MapGet("status", () => nodes() is { } m ? Results.Ok(Status(m)) : Unavailable());
 
@@ -381,10 +393,9 @@ internal static class Endpoints
                 (c?.Activity ?? []).Select(a => new LogEntryDto(a.At, Lower(a.Level), a.Text)).ToArray(),
                 c is null || c.RememberedPeerLimit == int.MaxValue ? null : c.RememberedPeerLimit));
         }
-        return new DebugDto(DateTimeOffset.UtcNow, PluginVersion, list);
+        return new DebugDto(DateTimeOffset.UtcNow, _pluginVersion, list,
+            new HistoryDto(m.Store.Summaries().Count, m.Store.Bytes, MessageStore.MaxTotalBytes));
     }
-
-    private const string PluginVersion = "0.4.1";
 
     private static IResult Unavailable() =>
         Results.Problem("Mesh Messenger is not initialized.", statusCode: StatusCodes.Status503ServiceUnavailable);
@@ -427,7 +438,7 @@ internal static class Endpoints
                     n.Enabled ? null : "Turned off in settings.", n.Identity, n.FindIfAddressChanges, null, null, 0, 0, [], 0, null, null, false, false)
                 : NodeToDto(n, c);
         }).ToArray();
-        return new StatusDto(list, m.Config.ScanRanges ?? [], m.Config.HistoryPerConversation, m.Store.Version);
+        return new StatusDto(list, m.Config.ScanRanges ?? [], m.Config.HistoryPerConversation, m.Store.Version, _pluginVersion);
     }
 
     private static string DisplayName(NodeConfig n) => string.IsNullOrWhiteSpace(n.Name) ? n.Id : n.Name;

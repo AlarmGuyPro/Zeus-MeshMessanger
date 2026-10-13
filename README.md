@@ -3,10 +3,10 @@
 Read, send and reply to **Meshtastic** and **MeshCore** text messages from
 inside Zeus, through LoRa nodes (such as a Heltec V4) on your Wi-Fi.
 
-> Status: 0.4.1, working and in daily use. Both connectors are implemented and
-> tested against real hardware — a Heltec V4 running MeshCore companion Wi-Fi
-> firmware and another running Meshtastic — as well as against simulated nodes
-> in the test suite.
+> Status: 1.0.0. Both connectors are implemented and tested against real
+> hardware — a Heltec V4 running MeshCore companion Wi-Fi firmware and another
+> running Meshtastic — as well as against simulated nodes in the test suite.
+> 0.4.1 is the version listed in the Zeus community catalog.
 
 User help: [docs/help](docs/help/README.md), including an
 [options reference](docs/help/options.md) that says what every setting does
@@ -79,8 +79,10 @@ This builds the panel (`web/`), the backend (`src/MeshMessenger/`) and writes
 `artifacts/io.github.alarmguypro.meshmessenger/io.github.alarmguypro.meshmessenger-<version>.zip`.
 Install it in Zeus with **Features → Community → Install local feature**.
 
-The version is set in two places that must match: `src/MeshMessenger/plugin.json`
-and `<Version>` in `src/MeshMessenger/MeshMessenger.csproj`.
+The version lives in `src/MeshMessenger/plugin.json` and nowhere else that
+matters: the panel shows whatever version Zeus loaded from that manifest. Two
+build files carry a copy (`MeshMessenger.csproj` and `web/package.json`), and
+the build refuses to run if either disagrees with the manifest.
 
 See [DESIGN.md](DESIGN.md) for the architecture and routing rules.
 

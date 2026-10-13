@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { useMemo, useState } from "react";
-import { type Client, type LogLevel, type NodeDebugDto } from "./api";
+import { type Client, type HistoryDto, type LogLevel, type NodeDebugDto } from "./api";
 import { NetworkBadge, usePoll } from "./Panel";
 import { cx } from "./styles";
 
@@ -26,8 +26,11 @@ function time(iso: string): string {
 }
 
 /** Plain text of everything on screen, for pasting into a bug report. */
-function asText(nodes: NodeDebugDto[], version: string): string {
+function asText(nodes: NodeDebugDto[], version: string, history?: HistoryDto | null): string {
   const lines = [`Mesh Messenger ${version} — ${new Date().toISOString()}`];
+  if (history) {
+    lines.push(`History: ${history.conversations} conversations, ${history.bytes} of ${history.budget} bytes`);
+  }
   for (const n of nodes) {
     lines.push(
       "",
@@ -40,26 +43,49 @@ function asText(nodes: NodeDebugDto[], version: string): string {
   return lines.join("\n");
 }
 
-export function Debug({ client }: { client: Client }) {
+/** Which kinds of line to show. "all" is everything; the rest narrow a busy log. */
+const views = [
+  { id: "all", label: "Everything", levels: null },
+  { id: "messages", label: "Messages", levels: ["send", "receive"] as LogLevel[] },
+  { id: "problems", label: "Problems", levels: ["warning", "error"] as LogLevel[] },
+] as const;
+
+type View = (typeof views)[number]["id"];
+
+/** Bytes as something a person reads at a glance. */
+function size(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function Logs({ client }: { client: Client }) {
   const [state] = usePoll(() => client.debug(), 2000, [client]);
   const [filter, setFilter] = useState("");
+  const [view, setView] = useState<View>("all");
   const [copied, setCopied] = useState(false);
 
   const nodes = state.kind === "ready" ? state.data.nodes : [];
+  const history = state.kind === "ready" ? state.data.history : null;
   const needle = filter.trim().toLowerCase();
+  const levels = views.find((v) => v.id === view)!.levels;
   const shown = useMemo(
     () =>
       nodes.map((n) => ({
         node: n,
-        activity: needle ? n.activity.filter((a) => a.text.toLowerCase().includes(needle)) : n.activity,
+        activity: n.activity.filter(
+          (a) =>
+            (levels === null || levels.includes(a.level)) &&
+            (needle === "" || a.text.toLowerCase().includes(needle)),
+        ),
       })),
-    [nodes, needle],
+    [nodes, needle, levels],
   );
 
   const copy = async () => {
     if (state.kind !== "ready") return;
     try {
-      await navigator.clipboard.writeText(asText(nodes, state.data.pluginVersion));
+      await navigator.clipboard.writeText(asText(nodes, state.data.pluginVersion, state.data.history));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -79,19 +105,39 @@ export function Debug({ client }: { client: Client }) {
           </button>
         </div>
         <p className={cx("help")}>
-          What each node and Zeus have done recently — connects, commands, replies and errors. Message text is never
-          logged. The log is kept in memory only and starts empty each time Zeus opens. Copy it into a bug report when
-          something doesn’t work.
+          What each node and Zeus have done recently — connects, commands, adverts, every message in and out, and
+          errors. Message text is never logged, only its size and how it arrived. The log is kept in memory only and
+          starts empty each time Zeus opens. Copy it into a bug report when something doesn’t work.
         </p>
+        <div className={cx("row")} role="group" aria-label="Which lines to show">
+          {views.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={view === v.id}
+              className={`${cx("button")} ${view === v.id ? cx("button--primary") : ""}`}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
         <label className={cx("field")}>
           <span>Search the log</span>
           <input
             className={cx("input")}
             value={filter}
-            placeholder="e.g. advert, ack, failed"
+            placeholder="e.g. advert, ack, channel, failed"
             onChange={(e) => setFilter(e.target.value)}
           />
         </label>
+        {history && (
+          <p className={cx("help")}>
+            Holding {history.conversations} conversation{history.conversations === 1 ? "" : "s"},{" "}
+            {size(history.bytes)} of {size(history.budget)}. Past that, the conversations heard from longest ago are
+            forgotten.
+          </p>
+        )}
       </section>
 
       {state.kind === "error" && (
@@ -133,13 +179,21 @@ export function Debug({ client }: { client: Client }) {
             node.contacts >= node.contactCapacity ? (
               <span className={cx("warn")}> — full, so it can’t save new stations</span>
             ) : null}
-            {node.contactsHeardOnly > 0 ? `, ${node.contactsHeardOnly} heard but not saved` : ""} · {node.channels}{" "}
-            channel{node.channels === 1 ? "" : "s"}
+            {node.contactsHeardOnly > 0 ? `, ${node.contactsHeardOnly} heard but not saved` : ""}
+            {node.rememberedPeerLimit && node.contactsHeardOnly >= node.rememberedPeerLimit ? (
+              <span className={cx("warn")}>
+                {" "}
+                — Zeus remembers {node.rememberedPeerLimit} of these and is forgetting the oldest
+              </span>
+            ) : null}{" "}
+            · {node.channels} channel{node.channels === 1 ? "" : "s"}
             {node.identity ? ` · paired with ${node.identity.slice(0, 12)}…` : ""}
           </p>
           {node.detail && <p className={cx("help")}>{node.detail}</p>}
           {activity.length === 0 ? (
-            <p className={cx("help")}>{needle ? "Nothing in the log matches." : "Nothing logged yet."}</p>
+            <p className={cx("help")}>
+              {needle || view !== "all" ? "Nothing in the log matches." : "Nothing logged yet."}
+            </p>
           ) : (
             <ol className={cx("log")}>
               {activity

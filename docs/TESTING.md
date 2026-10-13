@@ -57,7 +57,7 @@ workspace.
 | 10 | Room server (MeshCore) | Posts arrive in a Room conversation with author names |
 | 11 | Nodes → **Send advert**, then check another station | It lists this node within a minute |
 | 12 | Message a station shown as **heard · not saved** | Zeus saves it on the node, then sends |
-| 13 | **Debug** tab | A log of connects, sends and acknowledgements; **Copy all** works |
+| 13 | **Logs** tab | Connects, sends, arrivals and acknowledgements; the Everything / Messages / Problems filters and **Copy all** work |
 | 14 | A failed message → **Send again**, then **Clear them** | Retries, then tidies the thread |
 
 If something fails, the node's status line (hover it in the node bar) has the

@@ -124,7 +124,7 @@ as long as the node and the Zeus PC are on the same network segment. If your
 nodes live on another VLAN, mDNS won't reach you — type the address instead,
 with network **Meshtastic** and port **4403**.
 
-Then open **Debug**. You should see the connect, the configuration handshake,
+Then open **Logs**. You should see the connect, the configuration handshake,
 and the node reporting its firmware and radio settings.
 
 A new node shows an empty Nodes tab and a single channel with no messages.
@@ -231,4 +231,4 @@ above. Type the node's address in Zeus instead and give it a reservation.
 
 Collect these three things before asking anyone for help: the output of
 `py -m meshtastic --port COM12 --info`, the Wi-Fi portion of the `--noproto`
-log through a reboot, and **Copy all** from Zeus's [Debug tab](debug.md).
+log through a reboot, and **Copy all** from Zeus's [Logs tab](logs.md).

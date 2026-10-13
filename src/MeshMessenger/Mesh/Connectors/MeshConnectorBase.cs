@@ -56,7 +56,10 @@ public abstract class MeshConnectorBase : IMeshConnector
     private DateTimeOffset _nextRefind = DateTimeOffset.MinValue;
     private int _refindAttempts;
     private readonly Queue<LogEntry> _activity = new();
-    private const int MaxActivity = 400;
+    // Every arrival is logged from 1.0 on, so a busy mesh fills this faster than it used
+    // to. The log is memory only and starts empty each time Zeus opens, so holding more of
+    // it costs nothing but a little memory and buys a readable history of a session.
+    private const int MaxActivity = 1200;
 
     protected MeshConnectorBase(NodeConfig config, ConnectorOptions? options = null)
     {

@@ -67,6 +67,17 @@ public sealed class PluginHost : IAsyncDisposable
 
 public static class ApiTests
 {
+    [Test]
+    public static async Task TheVersionTheHostLoadedIsWhatThePanelShows()
+    {
+        // plugin.json is the only place the version is written. The panel is told what Zeus
+        // loaded from it, so a bug report can never quote a version nothing shipped with.
+        await using var host = await PluginHost.StartAsync(new FakePluginContext());
+        var expected = new FakePluginContext().Manifest.Version;
+        Assert.Equal(expected, (await host.GetAsync("status"))["pluginVersion"]!.GetValue<string>(), "status");
+        Assert.Equal(expected, (await host.GetAsync("debug"))["pluginVersion"]!.GetValue<string>(), "logs");
+    }
+
     [Test(Loopback = true)]
     public static async Task AddNodeReceiveReplyAndSurviveARestart()
     {

@@ -56,6 +56,24 @@ $id = [string]$manifest.id
 $version = [string]$manifest.version
 $entrypoint = [string]$manifest.entrypoint.assembly
 
+# plugin.json is where the version is written. Nothing reads a second copy at
+# runtime — the panel is told the version Zeus loaded from this manifest — but two
+# build files have to carry it as well, so they are checked here rather than
+# discovered to be stale after a release. Bump plugin.json and run this.
+$copies = @(
+    @{ Path = 'src/MeshMessenger/MeshMessenger.csproj'; Pattern = '<Version>([^<]+)</Version>' },
+    @{ Path = 'web/package.json';                      Pattern = '"version"\s*:\s*"([^"]+)"' },
+    @{ Path = 'web/package-lock.json';                 Pattern = '"version"\s*:\s*"([^"]+)"' }
+)
+foreach ($copy in $copies) {
+    $full = Join-Path $repoRoot $copy.Path
+    $found = [regex]::Match((Get-Content -Raw -LiteralPath $full), $copy.Pattern).Groups[1].Value
+    if ($found -ne $version) {
+        throw "$($copy.Path) says version $found but plugin.json says $version. Make them match (plugin.json is the source) and build again."
+    }
+}
+Write-Host "  Version $version, consistent across plugin.json and $($copies.Count) build file(s)." -ForegroundColor Green
+
 # 1. Browser builds, in contract order (the rebuild check runs them first too).
 if (-not $SkipWeb) {
     foreach ($node in @($contract.node)) {

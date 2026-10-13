@@ -51,7 +51,7 @@ The node bar shows its state (`connecting`, `connected`, `searching`,
 ## 4. Join your channels
 
 Join the same channels your other devices use (see [Channels and
-rooms](channels-and-rooms.md)) so Zeus sees the same group traffic.
+rooms](channels.md)) so Zeus sees the same group traffic.
 
 ## 5. Send a message
 

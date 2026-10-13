@@ -5,7 +5,7 @@ import { errorText, networkLabel, networkShort, type Client, type Network, type 
 import { Inbox } from "./Inbox";
 import { Nodes } from "./Nodes";
 import { Settings } from "./Settings";
-import { Debug } from "./Debug";
+import { Logs } from "./Logs";
 import { ROOT, cx } from "./styles";
 
 export type Load<T> = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; data: T };
@@ -54,7 +54,7 @@ function keepKeysLocal(e: KeyboardEvent<HTMLElement>) {
   }
 }
 
-type Tab = "inbox" | "nodes" | "settings" | "debug";
+type Tab = "inbox" | "nodes" | "settings" | "logs";
 
 export function Panel({ client }: { client: Client }) {
   const [tab, setTab] = useState<Tab>("inbox");
@@ -66,7 +66,7 @@ export function Panel({ client }: { client: Client }) {
   return (
     <div className={ROOT} onKeyDown={keepKeysLocal}>
       <div className={cx("tabs")} role="tablist" aria-label="Mesh Messenger">
-        {(["inbox", "nodes", "settings", "debug"] as Tab[]).map((t) => (
+        {(["inbox", "nodes", "settings", "logs"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -75,9 +75,15 @@ export function Panel({ client }: { client: Client }) {
             className={`${cx("tab")} ${tab === t ? cx("tab--on") : ""}`}
             onClick={() => setTab(t)}
           >
-            {t === "inbox" ? "Inbox" : t === "nodes" ? "Nodes" : t === "settings" ? "Settings" : "Debug"}
+            {t === "inbox" ? "Inbox" : t === "nodes" ? "Nodes" : t === "settings" ? "Settings" : "Logs"}
           </button>
         ))}
+        {/* Always on screen: the first thing any bug report needs. */}
+        {status.kind === "ready" && status.data.pluginVersion && (
+          <span className={cx("version")} title="Mesh Messenger version">
+            v{status.data.pluginVersion}
+          </span>
+        )}
       </div>
 
       {status.kind === "loading" && (
@@ -93,8 +99,8 @@ export function Panel({ client }: { client: Client }) {
 
       {status.kind === "ready" && (
         <>
-          {tab !== "settings" && tab !== "debug" && <NodeBar client={client} nodes={nodes} onChanged={refreshStatus} />}
-          {noNodes && tab !== "settings" && tab !== "debug" ? (
+          {tab !== "settings" && tab !== "logs" && <NodeBar client={client} nodes={nodes} onChanged={refreshStatus} />}
+          {noNodes && tab !== "settings" && tab !== "logs" ? (
             <div className={cx("pane")}>
               <div className={cx("card")}>
                 <h2 className={cx("h")}>Add your first node</h2>
@@ -113,8 +119,8 @@ export function Panel({ client }: { client: Client }) {
             <Inbox client={client} status={status.data} />
           ) : tab === "nodes" ? (
             <Nodes client={client} nodes={nodes} onChanged={refreshStatus} />
-          ) : tab === "debug" ? (
-            <Debug client={client} />
+          ) : tab === "logs" ? (
+            <Logs client={client} />
           ) : (
             <Settings client={client} status={status.data} onChanged={refreshStatus} />
           )}
