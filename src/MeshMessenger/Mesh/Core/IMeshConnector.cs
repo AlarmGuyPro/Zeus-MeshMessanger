@@ -68,6 +68,12 @@ public interface IMeshConnector : IAsyncDisposable
     /// </summary>
     int PeersSavedByTheNode { get; }
 
+    /// <summary>What the node does with stations it hears, or null when it can't say.</summary>
+    AutoAddPolicy? AutoAdd { get; }
+
+    /// <summary>Changes what the node saves on its own. Local to the node; transmits nothing.</summary>
+    Task<string?> SetAutoAddAsync(AutoAddPolicy policy, CancellationToken ct);
+
     /// <summary>Whether the node recycles its oldest contact when the list is full; null when the node has no such setting.</summary>
     bool? RecycleOldestWhenFull { get; }
 

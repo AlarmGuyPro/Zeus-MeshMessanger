@@ -19,7 +19,16 @@ public sealed record NodeDto(
     string? Identity, bool FindIfAddressChanges, string? PendingMove, SelfDto? Self,
     int MaxDirectTextBytes, int MaxChannelTextBytes, IReadOnlyList<ChannelDto> Channels, int PeerCount,
     int? PeerCapacity, bool? RecycleOldestWhenFull, bool CanAnnounce, bool CanEditChannels,
-    int PeersSavedByTheNode = 0);
+    int PeersSavedByTheNode = 0, AutoAddDto? AutoAdd = null);
+
+/// <summary>
+/// What the node saves on its own. <c>selective</c> false means it saves everything it hears
+/// and <c>kinds</c> is ignored by the firmware — both have to change together to stop a kind
+/// being saved. <c>maxHops</c> 0 means no distance limit.
+/// </summary>
+public sealed record AutoAddDto(bool Selective, bool Companions, bool Repeaters, bool RoomServers, bool Sensors, int MaxHops);
+
+public sealed record AutoAddRequest(bool? Selective, bool? Companions, bool? Repeaters, bool? RoomServers, bool? Sensors, int? MaxHops);
 
 public sealed record StatusDto(IReadOnlyList<NodeDto> Nodes, IReadOnlyList<string> ScanRanges, int HistoryPerConversation,
     long Version, string PluginVersion = "");
@@ -298,6 +307,23 @@ internal static class Endpoints
             return Results.Ok(new ActionResultDto(result.Error is null, result.Error, result.Removed));
         });
 
+        e.MapPost("nodes/{id}/autoadd", async (string id, AutoAddRequest body, CancellationToken ct) =>
+        {
+            if (nodes() is not { Router: { } r }) return Unavailable();
+            if (r.Connector(id) is not { } c) return Results.NotFound();
+            if (c.AutoAdd is not { } now) return Results.BadRequest(new { error = "This node can't report that setting." });
+            // Anything the request leaves out keeps its current value, so the panel can send
+            // one changed field without having to restate the rest.
+            var kinds = AutoAddKinds.None;
+            if (body.Companions ?? now.Kinds.HasFlag(AutoAddKinds.Companions)) kinds |= AutoAddKinds.Companions;
+            if (body.Repeaters ?? now.Kinds.HasFlag(AutoAddKinds.Repeaters)) kinds |= AutoAddKinds.Repeaters;
+            if (body.RoomServers ?? now.Kinds.HasFlag(AutoAddKinds.RoomServers)) kinds |= AutoAddKinds.RoomServers;
+            if (body.Sensors ?? now.Kinds.HasFlag(AutoAddKinds.Sensors)) kinds |= AutoAddKinds.Sensors;
+            var wanted = new AutoAddPolicy(body.Selective ?? now.Selective, kinds, body.MaxHops ?? now.MaxHops);
+            var error = await c.SetAutoAddAsync(wanted, ct).ConfigureAwait(false);
+            return Results.Ok(new ActionResultDto(error is null, error, 0));
+        });
+
         e.MapPost("nodes/{id}/channels", async (string id, JoinChannelRequest body, CancellationToken ct) =>
         {
             if (nodes() is not { Router: { } r }) return Unavailable();
@@ -448,7 +474,11 @@ internal static class Endpoints
         c.MaxTextBytes(ConversationKind.Direct), c.MaxTextBytes(ConversationKind.Channel),
         c.Channels.Select(ch => new ChannelDto(ch.Index, ch.Name, Lower(ch.Kind), ch.Primary)).ToArray(),
         c.Peers.Count, c.PeerCapacity, c.RecycleOldestWhenFull, c.CanAnnounce, c.CanEditChannels,
-        c.PeersSavedByTheNode);
+        c.PeersSavedByTheNode,
+        c.AutoAdd is { } a
+            ? new AutoAddDto(a.Selective, a.Kinds.HasFlag(AutoAddKinds.Companions), a.Kinds.HasFlag(AutoAddKinds.Repeaters),
+                a.Kinds.HasFlag(AutoAddKinds.RoomServers), a.Kinds.HasFlag(AutoAddKinds.Sensors), a.MaxHops)
+            : null);
 
     private static PeerDto PeerToDto(PeerInfo p) => new(
         p.Id, p.Name, p.ShortName, Lower(p.Kind), p.LastHeard, p.Snr, p.Hops, p.BatteryPercent, p.Latitude, p.Longitude, p.Favorite, p.SavedOnNode, p.LastUpdated);

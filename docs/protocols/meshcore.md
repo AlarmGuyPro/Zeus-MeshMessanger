@@ -154,6 +154,49 @@ The doc says indexes 0–7; the Heltec V4 Wi-Fi build has 40 slots — use
 - `PUSH_CODE_ADVERT` (0x80) + pub key: known contact re-advertised.
   `PUSH_CODE_NEW_ADVERT` (0x8A) + full contact record: new contact.
 
+## What the node saves by itself (auto-add)
+
+Read from the firmware, `examples/companion_radio/MyMesh.cpp`, not from any wiki — the one
+wiki that lists these omits the part that matters.
+
+| | |
+|---|---|
+| `CMD_SET_AUTOADD_CONFIG` | 58. `[58][config]`, optionally `[max_hops]`. The hop limit is only touched when the frame carries it, and is clamped to 64. |
+| `CMD_GET_AUTOADD_CONFIG` | 59 → `RESP_CODE_AUTOADD_CONFIG` 25: `[25][config][max_hops]`. |
+| `CMD_SET_OTHER_PARAMS` | 38. `[38][manual_add_contacts]`, and three optional bytes (telemetry modes, advert location policy, multi-acks) that are left alone when the frame is two bytes long. |
+| `manual_add_contacts` | Also in `SELF_INFO`, the byte immediately before the frequency — offset 47. |
+
+`autoadd_config` bits:
+
+```text
+0x01 AUTO_ADD_OVERWRITE_OLDEST   recycle the oldest non-favourite when the list is full
+0x02 AUTO_ADD_CHAT               companions
+0x04 AUTO_ADD_REPEATER           repeaters
+0x08 AUTO_ADD_ROOM_SERVER        room servers
+0x10 AUTO_ADD_SENSOR             sensors
+```
+
+**The trap.** `shouldAutoAddContactType` returns `true` for everything when
+`manual_add_contacts & 1` is clear, *without consulting the type bits at all*:
+
+```cpp
+bool MyMesh::shouldAutoAddContactType(uint8_t contact_type) const {
+  if ((_prefs.manual_add_contacts & 1) == 0) {
+    return true;
+  }
+  ...
+  return (_prefs.autoadd_config & type_bit) != 0;
+}
+```
+
+So clearing `AUTO_ADD_REPEATER` on a stock node changes nothing: the node is not selective,
+and saves every station it hears regardless. Both have to be written together. A node
+reporting no type bits at all is therefore not a node that saves nothing — it is usually a
+node that saves everything.
+
+Note also that the recycle setting shares the same byte as the type bits, so every write has
+to be read-modify-write or it will silently turn recycling off.
+
 ## Error codes
 
 `1` unsupported command · `2` not found · `3` table/queue full (retry) ·

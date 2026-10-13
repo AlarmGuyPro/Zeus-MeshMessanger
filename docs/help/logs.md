@@ -83,10 +83,16 @@ a count of how many it has saved since Zeus connected. That is not something Zeu
 a setting — it is counted from the node announcing each one, so when it says this, it is
 what the node is doing.
 
-Zeus cannot change it. Turn automatic adding off in the MeshCore app, or lower its hop
-limit so it only saves stations near you, and then one tidy-up will stick. If you would
-rather leave it adding everything, turn on **Recycle the oldest contact when the list is
-full** and a full list stops mattering.
+Change it under **What this node saves by itself**, on the same tab: set it to *Save only
+the kinds I choose* and untick **Repeaters**, or give it a hop limit of 1 or 2 so it only
+saves stations you can actually reach. Then one tidy-up will stick.
+
+Both settings are needed together, and Zeus handles that for you: a node set to save
+everything ignores the per-kind choices entirely, so unticking Repeaters on its own would do
+nothing. That is why the list of kinds is hidden until you choose to be selective.
+
+If you would rather leave it saving everything, turn on **Recycle the oldest contact when
+the list is full** and a full list stops mattering.
 
 ## The contact list is full
 

@@ -30,6 +30,9 @@ this version — see **[Not in this version](#not-in-this-version)** at the end.
 | Re-pair | Zeus remembers each node's identity and refuses a different node at the same address. Use Re-pair after re-flashing or replacing the board. | No | — |
 | Port | TCP port. Meshtastic 4403, MeshCore 5000 unless your firmware was built differently. | No | 4403 / 5000 |
 | Enabled | Off disconnects Zeus from the node without deleting its conversations. | No | On |
+| What this node saves by itself (MeshCore) | A setting on the node. **Save every station it hears** is how most nodes arrive, and on a busy mesh it fills the contact list within hours. **Save only the kinds I choose** turns on the per-kind choices below it. | No | the node's own |
+| Companions / Repeaters / Room servers / Sensors (MeshCore) | Which kinds the node saves, once it is set to save only the kinds you choose. Turning **Repeaters** off is what stops a list refilling with repeaters. They have no effect while the node is saving everything, and Zeus says so. | No | the node's own |
+| Only stations within this many hops (MeshCore) | The node ignores stations further away than this when saving. 0 means no limit. 1 or 2 keeps the list to stations you can actually reach. | No | 0 |
 | Recycle the oldest contact when the list is full (MeshCore) | A setting on the node. With it on, the node drops its oldest non-favourite contact to make room for a new one, so a full list never blocks new stations. With it off, a full list stays full and direct messages to new stations fail. | No | Off (the node's own default) |
 | Remove (a contact, MeshCore) | Deletes that contact from the node's list, freeing a slot. | No | — |
 | ☆ (a contact, MeshCore) | Marks the contact a favourite on the node. Favourites are never recycled and never swept up by **Tidy the list**. | No | Off |

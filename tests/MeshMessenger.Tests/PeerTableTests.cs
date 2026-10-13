@@ -170,3 +170,96 @@ public static class SelfAddingNodeTests
         await Assert.Eventually(() => c.PeersSavedByTheNode == 2, "both counted");
     }
 }
+
+/// <summary>
+/// Changing what the node saves on its own. Verified against the firmware
+/// (examples/companion_radio/MyMesh.cpp): the per-kind bits in autoadd_config are only
+/// consulted when manual_add_contacts bit 0 is set — otherwise the node saves everything and
+/// the bits mean nothing. A control that set one without the other would silently do nothing.
+/// </summary>
+public static class AutoAddTests
+{
+    private static ConnectorOptions Fast => new()
+    {
+        MinBackoff = TimeSpan.FromMilliseconds(100),
+        ConnectTimeout = TimeSpan.FromSeconds(2),
+    };
+
+    private static async Task<(FakeMeshCoreNode Node, MeshCoreConnector Connector)> ConnectedAsync(
+        byte config, byte manual = 0, byte hops = 0)
+    {
+        var node = new FakeMeshCoreNode { AutoAddConfig = config, ManualAddContacts = manual, AutoAddMaxHops = hops };
+        var c = new MeshCoreConnector(
+            new NodeConfig { Id = "mc", Network = MeshNetwork.MeshCore, Host = "127.0.0.1", Port = node.Port }, Fast);
+        await c.StartAsync(default);
+        await Assert.Eventually(() => c.State == ConnectorState.Connected, "connected");
+        return (node, c);
+    }
+
+    [Test(Loopback = true)]
+    public static async Task ANodeThatSavesEverythingSaysSoEvenWhenNoKindIsTicked()
+    {
+        // The state a stock node is in: manual_add_contacts clear, so every kind is saved
+        // whatever autoadd_config says. Reporting "saves nothing" here would be a lie.
+        var (node, c) = await ConnectedAsync(config: MeshCoreProtocol.AutoAddOverwriteOldest);
+        await using var _ = node;
+        await using var __ = c;
+
+        var policy = c.AutoAdd!;
+        Assert.False(policy.Selective, "not selective");
+        Assert.Equal(AutoAddKinds.None, policy.Kinds, "no kind bits set");
+        Assert.True(policy.AddsAnything, "but it still saves everything it hears");
+        Assert.Equal(0, policy.MaxHops, "no hop limit");
+    }
+
+    [Test(Loopback = true)]
+    public static async Task StoppingRepeatersSetsBothSettingsAndLeavesRecyclingAlone()
+    {
+        var (node, c) = await ConnectedAsync(config: MeshCoreProtocol.AutoAddOverwriteOldest);
+        await using var _ = node;
+        await using var __ = c;
+
+        var error = await c.SetAutoAddAsync(
+            new AutoAddPolicy(Selective: true, AutoAddKinds.Companions, MaxHops: 2), default);
+        Assert.Equal(null, error, error ?? "saved");
+
+        Assert.True(MeshCoreProtocol.AutoAddIsSelective(node.ManualAddContacts), "the node was made selective");
+        Assert.True((node.AutoAddConfig & MeshCoreProtocol.AutoAddChat) != 0, "companions kept");
+        Assert.True((node.AutoAddConfig & MeshCoreProtocol.AutoAddRepeater) == 0, "repeaters no longer saved");
+        // The recycle bit lives in the same byte and is not ours to touch.
+        Assert.True((node.AutoAddConfig & MeshCoreProtocol.AutoAddOverwriteOldest) != 0, "recycling untouched");
+        Assert.Equal(2, node.AutoAddMaxHops, "hop limit set");
+
+        var policy = c.AutoAdd!;
+        Assert.True(policy.Selective, "read back selective");
+        Assert.Equal(AutoAddKinds.Companions, policy.Kinds, "read back kinds");
+        Assert.Equal(2, policy.MaxHops, "read back hops");
+    }
+
+    [Test(Loopback = true)]
+    public static async Task TurningRecyclingOffDoesNotDisturbTheKindsTheNodeSaves()
+    {
+        var (node, c) = await ConnectedAsync(
+            config: (byte)(MeshCoreProtocol.AutoAddOverwriteOldest | MeshCoreProtocol.AutoAddRepeater),
+            manual: 1);
+        await using var _ = node;
+        await using var __ = c;
+
+        Assert.Equal(null, await c.SetRecycleOldestWhenFullAsync(false, default), "recycling off");
+        Assert.True((node.AutoAddConfig & MeshCoreProtocol.AutoAddOverwriteOldest) == 0, "recycling cleared");
+        Assert.True((node.AutoAddConfig & MeshCoreProtocol.AutoAddRepeater) != 0, "repeater bit survived");
+        Assert.Equal(AutoAddKinds.Repeaters, c.AutoAdd!.Kinds, "kinds unchanged");
+    }
+
+    [Test(Loopback = true)]
+    public static async Task AnImpossibleHopLimitIsRefusedBeforeAnythingIsSent()
+    {
+        var (node, c) = await ConnectedAsync(config: 0);
+        await using var _ = node;
+        await using var __ = c;
+        var before = node.AutoAddConfig;
+
+        Assert.Contains("0 and 64", await c.SetAutoAddAsync(new AutoAddPolicy(true, AutoAddKinds.None, 99), default) ?? "", "refused");
+        Assert.Equal(before, node.AutoAddConfig, "nothing was written");
+    }
+}

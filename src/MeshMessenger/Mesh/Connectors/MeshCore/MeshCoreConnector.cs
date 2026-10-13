@@ -57,6 +57,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
     public const int MaxHeardStations = 300;
     private int _maxContacts;
     private byte? _autoAddConfig;
+    private byte _manualAddContacts;
     private byte _autoAddMaxHops;
     private List<ChannelSlot> _slots = [];
     private SelfInfoFrame? _self;
@@ -144,7 +145,11 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             var selfFrame = await CommandAsync(AppStart(AppName), c => c == RespSelfInfo, session.Token).ConfigureAwait(false);
             var self = ParseSelfInfo(selfFrame);
             CheckIdentity(Convert.ToHexString(self.PublicKey).ToLowerInvariant());
-            lock (_gate) _self = self;
+            lock (_gate)
+            {
+                _self = self;
+                _manualAddContacts = self.ManualAddContacts;
+            }
             Self = new SelfInfo(
                 Convert.ToHexString(self.PublicKey).ToLowerInvariant(),
                 self.Name.Length > 0 ? self.Name : "MeshCore node",
@@ -166,6 +171,7 @@ public sealed class MeshCoreConnector : MeshConnectorBase
             }
 
             await LoadAutoAddConfigAsync(session.Token).ConfigureAwait(false);
+            if (AutoAdd is { } policy) Log(LogLevel.Info, Describe(policy));
             await LoadContactsAsync(session.Token).ConfigureAwait(false);
             await LoadChannelsAsync(Math.Clamp(device.MaxChannels, 1, 64), session.Token).ConfigureAwait(false);
             Log(LogLevel.Info, $"{_contacts.Count} contact(s) and {_slots.Count(x => !x.IsEmpty)} channel(s) on the node.");
@@ -941,6 +947,91 @@ public sealed class MeshCoreConnector : MeshConnectorBase
         {
             return "The node didn't answer.";
         }
+    }
+
+    public override AutoAddPolicy? AutoAdd
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_autoAddConfig is not { } cfg) return null;
+                var kinds = AutoAddKinds.None;
+                if ((cfg & AutoAddChat) != 0) kinds |= AutoAddKinds.Companions;
+                if ((cfg & AutoAddRepeater) != 0) kinds |= AutoAddKinds.Repeaters;
+                if ((cfg & AutoAddRoomServer) != 0) kinds |= AutoAddKinds.RoomServers;
+                if ((cfg & AutoAddSensor) != 0) kinds |= AutoAddKinds.Sensors;
+                return new AutoAddPolicy(AutoAddIsSelective(_manualAddContacts), kinds, _autoAddMaxHops);
+            }
+        }
+    }
+
+    public override async Task<string?> SetAutoAddAsync(AutoAddPolicy policy, CancellationToken ct)
+    {
+        if (State != ConnectorState.Connected) return $"{DisplayName} is not connected.";
+        if (policy.MaxHops is < 0 or > 64) return "The hop limit has to be between 0 and 64 (0 means no limit).";
+
+        byte config, manual;
+        lock (_gate)
+        {
+            if (_autoAddConfig is null) return "This node's firmware doesn't have that setting.";
+            config = _autoAddConfig.Value;
+            manual = _manualAddContacts;
+        }
+
+        // Read, modify, write: only the four type bits are ours. Everything else in the byte
+        // — the recycle bit, and anything a later firmware adds — is left exactly as it was.
+        var kinds = (byte)(
+            (policy.Kinds.HasFlag(AutoAddKinds.Companions) ? AutoAddChat : 0) |
+            (policy.Kinds.HasFlag(AutoAddKinds.Repeaters) ? AutoAddRepeater : 0) |
+            (policy.Kinds.HasFlag(AutoAddKinds.RoomServers) ? AutoAddRoomServer : 0) |
+            (policy.Kinds.HasFlag(AutoAddKinds.Sensors) ? AutoAddSensor : 0));
+        var nextConfig = (byte)((config & ~AutoAddAllKinds) | kinds);
+        var nextManual = (byte)(policy.Selective ? manual | 1 : manual & ~1);
+
+        try
+        {
+            if (nextConfig != config || policy.MaxHops != _autoAddMaxHops)
+            {
+                await CommandAsync(SetAutoAddConfig(nextConfig, (byte)policy.MaxHops), c => c is RespOk, ct).ConfigureAwait(false);
+                lock (_gate)
+                {
+                    _autoAddConfig = nextConfig;
+                    _autoAddMaxHops = (byte)policy.MaxHops;
+                }
+            }
+            // Second command, and the one that decides whether the type bits mean anything.
+            if (nextManual != manual)
+            {
+                await CommandAsync(SetOtherParams(nextManual), c => c is RespOk, ct).ConfigureAwait(false);
+                lock (_gate) _manualAddContacts = nextManual;
+            }
+            Log(LogLevel.Info, Describe(AutoAdd!));
+            RaiseChanged();
+            return null;
+        }
+        catch (MeshCoreException ex)
+        {
+            Log(LogLevel.Error, $"Changing what the node saves failed: {ex.Message} (code {ex.Code}).");
+            return ex.Message;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException)
+        {
+            return "The node didn't answer.";
+        }
+    }
+
+    private static string Describe(AutoAddPolicy p)
+    {
+        var hops = p.MaxHops == 0 ? "any distance away" : $"within {p.MaxHops} hop{(p.MaxHops == 1 ? "" : "s")}";
+        if (!p.Selective) return $"The node now saves every station it hears, {hops}.";
+        if (p.Kinds == AutoAddKinds.None) return "The node now saves nothing on its own; contacts are added only when you message a station.";
+        var names = new List<string>();
+        if (p.Kinds.HasFlag(AutoAddKinds.Companions)) names.Add("companions");
+        if (p.Kinds.HasFlag(AutoAddKinds.Repeaters)) names.Add("repeaters");
+        if (p.Kinds.HasFlag(AutoAddKinds.RoomServers)) names.Add("room servers");
+        if (p.Kinds.HasFlag(AutoAddKinds.Sensors)) names.Add("sensors");
+        return $"The node now saves only {string.Join(", ", names)} it hears, {hops}.";
     }
 
     public override async Task<string?> SetRecycleOldestWhenFullAsync(bool enabled, CancellationToken ct)

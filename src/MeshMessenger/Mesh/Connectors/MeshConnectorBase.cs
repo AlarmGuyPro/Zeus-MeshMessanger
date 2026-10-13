@@ -172,6 +172,11 @@ public abstract class MeshConnectorBase : IMeshConnector
 
     public virtual int PeersSavedByTheNode => 0;
 
+    public virtual AutoAddPolicy? AutoAdd => null;
+
+    public virtual Task<string?> SetAutoAddAsync(AutoAddPolicy policy, CancellationToken ct) =>
+        Task.FromResult<string?>($"{DisplayName} has no such setting.");
+
     public virtual bool? RecycleOldestWhenFull => null;
 
     public virtual Task<string?> RemovePeerAsync(string peerId, CancellationToken ct) =>

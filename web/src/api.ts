@@ -47,12 +47,25 @@ export interface NodeDto {
   canEditChannels: boolean;
   /** Stations the node has added to its own contact list, unprompted, since Zeus connected. */
   peersSavedByTheNode?: number;
+  /** MeshCore: what the node saves on its own. */
+  autoAdd?: AutoAddDto | null;
   pendingMove?: string;
   self?: SelfDto;
   maxDirectTextBytes: number;
   maxChannelTextBytes: number;
   channels: ChannelDto[];
   peerCount: number;
+}
+
+export interface AutoAddDto {
+  /** False means the node saves everything it hears and the kind flags below are ignored. */
+  selective: boolean;
+  companions: boolean;
+  repeaters: boolean;
+  roomServers: boolean;
+  sensors: boolean;
+  /** 0 means no distance limit. */
+  maxHops: number;
 }
 
 export interface StatusDto {
@@ -287,6 +300,8 @@ export function createClient(api: ZeusPluginApi) {
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/channels`, { name, secret }),
     leaveChannel: (nodeId: string, index: number) =>
       call<ActionResultDto>("DELETE", `/nodes/${enc(nodeId)}/channels/${index}`),
+    setAutoAdd: (nodeId: string, body: Partial<AutoAddDto>) =>
+      call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/autoadd`, body),
     setRecycleOldest: (nodeId: string, enabled: boolean) =>
       call<ActionResultDto>("POST", `/nodes/${enc(nodeId)}/recycle-oldest`, { enabled }),
     debug: () => call<DebugDto>("GET", "/debug"),

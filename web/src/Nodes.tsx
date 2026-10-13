@@ -51,6 +51,113 @@ function heardTitle(p: PeerDto): string {
  * name lands on the same channel, while any other channel's key has to be
  * shared out of band. Nothing here transmits.
  */
+/**
+ * What the node saves to its own contact list. Two settings that have to agree: the firmware
+ * ignores the per-kind choices entirely unless the node is selective, so offering the kinds
+ * alone would be a control that silently does nothing.
+ */
+function AutoAdd({ client, node, onChanged }: { client: Client; node: NodeDto; onChanged: () => void }) {
+  const auto = node.autoAdd;
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
+  const [hops, setHops] = useState<string>("");
+
+  if (!auto) return null;
+
+  const save = async (body: Partial<typeof auto>) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await client.setAutoAdd(node.id, body);
+      setNote(
+        result.ok
+          ? { kind: "ok", text: "Saved on the node." }
+          : { kind: "warn", text: result.error ?? "The node wouldn’t take that." },
+      );
+      onChanged();
+    } catch (err) {
+      setNote({ kind: "warn", text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const kinds: { key: "companions" | "repeaters" | "roomServers" | "sensors"; label: string }[] = [
+    { key: "companions", label: "Companions (other operators)" },
+    { key: "repeaters", label: "Repeaters" },
+    { key: "roomServers", label: "Room servers" },
+    { key: "sensors", label: "Sensors" },
+  ];
+
+  return (
+    <>
+      <div className={cx("row")}>
+        <strong>What this node saves by itself</strong>
+        <span className={cx("grow")} />
+        <span className={cx("tx-label")}>Transmits: no</span>
+      </div>
+
+      <label className={cx("field")}>
+        <span>When it hears a station</span>
+        <select
+          className={cx("input")}
+          value={auto.selective ? "selective" : "everything"}
+          disabled={busy}
+          onChange={(e) => void save({ selective: e.target.value === "selective" })}
+        >
+          <option value="everything">Save every station it hears</option>
+          <option value="selective">Save only the kinds I choose</option>
+        </select>
+      </label>
+
+      {auto.selective ? (
+        <>
+          {kinds.map((k) => (
+            <label key={k.key} className={cx("row")}>
+              <input type="checkbox" checked={auto[k.key]} disabled={busy} onChange={(e) => void save({ [k.key]: e.target.checked })} />
+              <span>{k.label}</span>
+            </label>
+          ))}
+        </>
+      ) : (
+        <p className={cx("help")}>
+          Every kind is saved while this is set, so the choice of kinds has no effect until you switch to{" "}
+          <strong>Save only the kinds I choose</strong>.
+        </p>
+      )}
+
+      <label className={cx("field")}>
+        <span>Only stations within this many hops (0 means any distance)</span>
+        <input
+          className={cx("input")}
+          type="number"
+          min={0}
+          max={64}
+          value={hops === "" ? auto.maxHops : hops}
+          disabled={busy}
+          onChange={(e) => setHops(e.target.value)}
+          onBlur={() => {
+            const n = Number(hops);
+            if (hops !== "" && Number.isInteger(n) && n >= 0 && n <= 64 && n !== auto.maxHops) void save({ maxHops: n });
+            setHops("");
+          }}
+        />
+      </label>
+
+      <p className={cx("help")}>
+        A setting on the node itself, not in Zeus — it keeps working when Zeus is closed. On a busy mesh, saving every
+        repeater it hears fills the contact list within hours, which is why contacts you remove reappear. Narrowing
+        this is what makes a tidy-up stick.
+      </p>
+      {note && (
+        <p className={note.kind === "warn" ? cx("over") : cx("help")} role="status">
+          {note.text}
+        </p>
+      )}
+    </>
+  );
+}
+
 function Channels({ client, node, onChanged }: { client: Client; node: NodeDto; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -494,12 +601,12 @@ export function Nodes({ client, nodes, onChanged }: { client: Client; nodes: Nod
         {selfAdding && (
           <p className={cx("notice")} role="status">
             <strong>This node adds stations by itself.</strong> It has saved {node.peersSavedByTheNode} station
-            {node.peersSavedByTheNode === 1 ? "" : "s"} since Zeus connected, without being asked — that is the node's
-            own setting, not Zeus. So its list fills up on its own, and anything you remove here comes back as it hears
-            it again. To stop that, turn off automatic adding (or lower its hop limit) in the MeshCore app. Leaving
-            recycling on, below, means a full list never blocks a new station either way.
+            {node.peersSavedByTheNode === 1 ? "" : "s"} since Zeus connected, without being asked. So its list fills up
+            on its own, and anything you remove here comes back as it hears it again — change what it saves below.
           </p>
         )}
+
+        <AutoAdd client={client} node={node} onChanged={onChanged} />
 
         {hasCapacity && all.length > 0 && (
           <>

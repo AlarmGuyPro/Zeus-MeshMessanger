@@ -36,6 +36,12 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
     /// <summary>MAX_CONTACTS in the firmware build; DEVICE_INFO reports half of it.</summary>
     public int MaxContacts { get; set; } = 350;
     public byte AutoAddConfig { get; set; }
+
+    /// <summary>The node's auto-add hop limit; 0 means no limit, as the firmware has it.</summary>
+    public byte AutoAddMaxHops { get; set; }
+
+    /// <summary>Bit 0 set means the node consults the type bits instead of saving everything.</summary>
+    public byte ManualAddContacts { get; set; }
     /// <summary>The firmware's reserved scratch slots, sent by its contacts iterator.</summary>
     public int ReservedSlots { get; set; } = 8;
     public int Connections;
@@ -219,6 +225,7 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 f[2] = 22;
                 f[3] = 22;
                 PublicKey.CopyTo(f, 4);
+                f[47] = ManualAddContacts; // the firmware writes it immediately before the frequency
                 BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(48), 910525);
                 BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(52), 62500);
                 f[56] = 7;
@@ -372,10 +379,16 @@ public sealed class FakeMeshCoreNode : IAsyncDisposable
                 break;
             }
             case CmdGetAutoAddConfig:
-                await WriteAsync(s, [RespAutoAddConfig, AutoAddConfig, 0]);
+                await WriteAsync(s, [RespAutoAddConfig, AutoAddConfig, AutoAddMaxHops]);
+                break;
+            case CmdSetOtherParams:
+                ManualAddContacts = cmd[1];
+                await WriteAsync(s, [RespOk]);
                 break;
             case CmdSetAutoAddConfig:
                 AutoAddConfig = cmd[1];
+                // The firmware only touches the hop limit when the frame carries one.
+                if (cmd.Length >= 3) AutoAddMaxHops = Math.Min(cmd[2], (byte)64);
                 await WriteAsync(s, [RespOk]);
                 break;
             case CmdGetBattAndStorage:

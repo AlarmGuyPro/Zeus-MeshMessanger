@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 using System.Net;
 using System.Text;
+using MeshMessenger.Connectors.MeshCore;
 using MeshMessenger.Core;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
@@ -30,7 +31,12 @@ public static class Preview
         // The fakes listen on loopback, which the shipped validator refuses.
         MeshMessenger.Discovery.HostValidator.AllowLoopback = true;
 
-        await using var meshcore = new FakeMeshCoreNode();
+        // A node in the state most are in: saving everything it hears, recycling on.
+        await using var meshcore = new FakeMeshCoreNode
+        {
+            AutoAddConfig = MeshCoreProtocol.AutoAddOverwriteOldest,
+            ManualAddContacts = 0,
+        };
         await using var meshtastic = new FakeMeshtasticNode();
         var settings = new MemorySettings();
         var plugin = new MeshMessengerPlugin();

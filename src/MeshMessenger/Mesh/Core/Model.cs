@@ -198,3 +198,26 @@ public sealed record BulkRemoval(int Removed, int Requested, string? Error)
 {
     public bool Complete => Error is null && Removed == Requested;
 }
+
+/// <summary>Which kinds of station a MeshCore node saves to its contact list on its own.</summary>
+[Flags]
+public enum AutoAddKinds
+{
+    None = 0,
+    Companions = 1 << 0,
+    Repeaters = 1 << 1,
+    RoomServers = 1 << 2,
+    Sensors = 1 << 3,
+}
+
+/// <summary>
+/// What a MeshCore node does with the stations it hears. <paramref name="Selective"/> is the
+/// one that catches people out: when it is false the node saves <em>everything</em> and
+/// <paramref name="Kinds"/> is ignored by the firmware, so turning a kind off has no effect
+/// until the node is made selective as well.
+/// </summary>
+public sealed record AutoAddPolicy(bool Selective, AutoAddKinds Kinds, int MaxHops)
+{
+    /// <summary>True when the node will save a station it hears without being asked.</summary>
+    public bool AddsAnything => !Selective || Kinds != AutoAddKinds.None;
+}

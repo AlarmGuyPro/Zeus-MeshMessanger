@@ -23,7 +23,7 @@ public static class MeshCoreProtocol
         CmdSetDeviceTime = 6, CmdSendSelfAdvert = 7, CmdAddUpdateContact = 9, CmdSyncNextMessage = 10, CmdResetPath = 13,
         CmdGetBattAndStorage = 20, CmdDeviceQuery = 22, CmdSendLogin = 26, CmdSendStatusReq = 27,
         CmdRemoveContact = 15, CmdGetChannel = 31, CmdSetChannel = 32, CmdSendTracePath = 36, CmdSendPathDiscovery = 52, CmdGetStats = 56,
-        CmdSetAutoAddConfig = 58, CmdGetAutoAddConfig = 59;
+        CmdSetAutoAddConfig = 58, CmdGetAutoAddConfig = 59, CmdSetOtherParams = 38;
 
     // Replies
     public const byte RespOk = 0, RespErr = 1, RespContactsStart = 2, RespContact = 3, RespEndOfContacts = 4,
@@ -124,8 +124,38 @@ public static class MeshCoreProtocol
 
     public static byte[] GetBattery() => [CmdGetBattAndStorage];
 
-    /// <summary>Bit 0 of the node's auto-add config: recycle the oldest non-favourite contact when the list is full.</summary>
+    // The node's auto-add config byte, from the firmware (examples/companion_radio/MyMesh.cpp,
+    // AUTO_ADD_* defines). The type bits decide which kinds of station the node saves on its
+    // own — but only when it is in selective mode. See AutoAddIsSelective below, which is the
+    // part that catches people out.
+    /// <summary>Bit 0: recycle the oldest non-favourite contact when the list is full.</summary>
     public const byte AutoAddOverwriteOldest = 1 << 0;
+    /// <summary>Bit 1: auto-add other companion ("chat") stations.</summary>
+    public const byte AutoAddChat = 1 << 1;
+    /// <summary>Bit 2: auto-add repeaters. On a busy mesh this is the one that fills the list.</summary>
+    public const byte AutoAddRepeater = 1 << 2;
+    /// <summary>Bit 3: auto-add room servers.</summary>
+    public const byte AutoAddRoomServer = 1 << 3;
+    /// <summary>Bit 4: auto-add sensor nodes.</summary>
+    public const byte AutoAddSensor = 1 << 4;
+
+    /// <summary>Every station kind the type bits cover, so unknown bits are never disturbed.</summary>
+    public const byte AutoAddAllKinds = AutoAddChat | AutoAddRepeater | AutoAddRoomServer | AutoAddSensor;
+
+    /// <summary>
+    /// Whether the node consults the type bits at all. The firmware reads
+    /// <c>manual_add_contacts</c> bit 0: when it is clear the node saves <em>everything</em> it
+    /// hears and the type bits are ignored entirely, so clearing the repeater bit on its own
+    /// changes nothing. Both have to be set together to stop repeaters being saved.
+    /// </summary>
+    public static bool AutoAddIsSelective(byte manualAddContacts) => (manualAddContacts & 1) != 0;
+
+    /// <summary>
+    /// Sets <c>manual_add_contacts</c>. The firmware (CMD_SET_OTHER_PARAMS) only touches the
+    /// telemetry, advert-location and multi-ack preferences when the frame is longer than two
+    /// bytes, so a two-byte frame changes this and nothing else.
+    /// </summary>
+    public static byte[] SetOtherParams(byte manualAddContacts) => [CmdSetOtherParams, manualAddContacts];
 
     /// <summary>Delete a contact from the node's list. Local to the node; transmits nothing.</summary>
     public static byte[] RemoveContact(ReadOnlySpan<byte> publicKey32)
@@ -194,7 +224,8 @@ public static class MeshCoreProtocol
         return new DeviceInfo(code, 0, 8, null, null, null);
     }
 
-    public sealed record SelfInfoFrame(byte[] PublicKey, string Name, double FrequencyMHz, double BandwidthKHz, int SpreadingFactor, int CodingRate, int TxPowerDbm);
+    public sealed record SelfInfoFrame(byte[] PublicKey, string Name, double FrequencyMHz, double BandwidthKHz,
+        int SpreadingFactor, int CodingRate, int TxPowerDbm, byte ManualAddContacts = 0);
 
     public static SelfInfoFrame ParseSelfInfo(ReadOnlySpan<byte> f)
     {
@@ -203,15 +234,18 @@ public static class MeshCoreProtocol
         double freq = 0, bw = 0;
         int sf = 0, cr = 0;
         var name = "";
+        byte manualAdd = 0;
         if (f.Length >= 58)
         {
+            // The firmware writes manual_add_contacts immediately before the frequency.
+            manualAdd = f[47];
             freq = BinaryPrimitives.ReadUInt32LittleEndian(f[48..]) / 1000.0;
             bw = BinaryPrimitives.ReadUInt32LittleEndian(f[52..]) / 1000.0;
             sf = f[56];
             cr = f[57];
             name = Encoding.UTF8.GetString(f[58..]).TrimEnd('\0').Trim();
         }
-        return new SelfInfoFrame(key, name, freq, bw, sf, cr, (sbyte)f[2]);
+        return new SelfInfoFrame(key, name, freq, bw, sf, cr, (sbyte)f[2], manualAdd);
     }
 
     /// <summary>
