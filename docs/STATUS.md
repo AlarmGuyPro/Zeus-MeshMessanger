@@ -70,6 +70,35 @@ A day of real use on a busy mesh, in the order it was found:
    entirely unless the node is also made selective — so the obvious control
    would have done nothing. See `docs/protocols/meshcore.md`.
 
+## One report that turned out not to be a bug
+
+A bench report of "viewing the channels crashed Zeus and reset the workspace",
+minutes after installing 1.0.1. Zeus's own log says otherwise, and the sequence
+is worth keeping because it will happen again:
+
+```text
+18:46:39  POST /shutdown   engine.shutdown accepted     <- requested, not a fault
+18:46:43  antennagenius [info] Stopped.                 <- orderly plugin teardown
+18:46:44  PowerStation stopped
+18:47:00  station-engine start pid=26008                <- a fresh engine process
+18:47:01  Loaded plugin io.github.alarmguypro.meshmessenger v1.0.1
+18:47:01  Mesh Messenger initialized with 2 node(s)
+```
+
+Installing a feature restarts the Zeus engine, and the restart resets the
+workspace layout. There is no exception anywhere in the window, the plugins
+shut down one at a time with their own goodbyes, and the feature came back up
+clean. The panel's own endpoints were not called once in the three minutes that
+followed, so the panel had not even been opened yet.
+
+**The supervisor log is not the one to ask.** `support-agent.log` carries
+heartbeats and process starts and records 36 restarts in five days, so a restart
+in it proves nothing. `zeus-app.log` and its rotations are where the plugin
+lines and any exception live.
+
+The error boundary added that evening stays. A feature still should not be able
+to take its host's window down, and it costs nothing to make sure it cannot.
+
 ## What to do next
 
 1. **Publish 1.0.1**, with `docs/submission/`. Take the screenshots
