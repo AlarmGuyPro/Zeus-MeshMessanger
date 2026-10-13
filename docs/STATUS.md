@@ -1,80 +1,85 @@
 # Where this project stands
 
-Last updated 13 October 2026, with 1.0.0 built and every local gate green.
+Last updated 13 October 2026, with 1.0.1 built, gated and bench-tested.
 Read this first when picking the project back up.
 
 ## Shipped, and listed
 
 **0.4.1 is in the Zeus community catalog.**
 [PR #19](https://github.com/Zeus-SDR/zeus-community-features/pull/19) was
-merged, `registry.json` on `main` carries the entry, and the package is
-mirrored into custody. It shipped in the Zeus release of 12 October.
+merged and the package is mirrored into custody. It shipped in the Zeus
+release of 12 October.
 
-**1.0.0 is built and ready to submit**, but **not yet released and not yet on
-the bench**. It answers all six review findings.
+**1.0.1 is built, gated and bench-tested**, and is the one to submit. (1.0.0
+was built and gated but never released: a day of real use produced seven
+findings, and two builds must not both answer to the same version now that the
+panel shows it.)
 
 | | |
 |---|---|
-| Pinned commit | `986bbd9bb6273e4fbcb921110b5cb5adfab4d95e` |
-| SHA-256 | `bbb345149e35fed650467243581e8e0f908f26d2d3321289cecdbe39742b9986` |
+| Pinned commit | `21a07e23ffed0e49469886e9b6204e3ef6e3ee7b` |
+| SHA-256 | `abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b` |
 | Package validation | pass |
 | Security scan | CLEAR, 0 fail, 0 review |
 | Source rebuild | clear, from a clean clone of the pinned commit |
-| Registry edit | `validate-registry`, `test-community-custody` and `test-catalog-publication` all pass with the 1.0.0 entry appended |
-| Tests | 48/48 |
+| Registry edit | `validate-registry` and `test-community-custody` pass with 1.0.1 appended; the exact diff is `docs/submission/registry-1.0.1.patch` |
+| Tests | 55/55 |
 | Mutation check | all four of the maintainer's mutations turn the suite red |
 
-**Nothing is published yet.** The release and the catalog PR wait until 1.0.0
-has run on the bench, because a published release can never be replaced — the
-registry pins the SHA-256 of one exact archive.
+**Nothing is published yet.** `docs/submission/` is ready: `submit-1-release.ps1`
+cuts the release, `submit-2-registry.ps1` appends the version to the existing
+catalog entry and refuses to proceed if the published 0.4.1 object does not
+survive its own edit. Take the screenshots first and attach them.
 
-## What 1.0.0 changed
+## What 1.0 answered from the review
 
-The six review findings, all confirmed against the code before being fixed:
+All six findings, each confirmed against the code before being fixed:
 
 | | Finding | What was done |
 |---|---|---|
-| #47 | A MeshCore channel index that is not a real slot cast to a byte and transmitted on the public channel | Refused by name before anything is sent, with a test that proves nothing reaches the wire |
-| #48 | Four security mutations left all 32 tests passing | Loopback is granted per test now, not suite-wide; six new tests in `SecurityTests.cs`; `scripts/mutation-check.py` repeats the maintainer's run as an acceptance check |
-| #49 | The whole history was one settings value rewritten every 2 s | One value per conversation plus an index; only what changed is written; 192 KB per conversation and 4 MB in total, enforced by dropping the oldest on purpose |
-| #50 | `_heard` and `_nodes` grew without bound, and the Meshtastic map was copied per packet | Both mutated in place and capped, oldest-first, by Zeus's own receive order rather than the sender's timestamp |
-| #51 | Docs described rooms, route tools, repeater status and Store & Forward, none of which ship | `options.md` rewritten and ends with what is absent; the route-tools page deleted; the PR's channel-keys claim corrected |
+| #47 | A channel index that is not a real slot cast to a byte and transmitted on the public channel | Refused by name before anything is sent |
+| #48 | Four security mutations left all 32 tests passing | Loopback granted per test, not suite-wide; six tests in `SecurityTests.cs`; `scripts/mutation-check.py` repeats the run as an acceptance check |
+| #49 | The whole history was one settings value rewritten every 2 s | One value per conversation plus an index; only what changed is written; 192 KB and 4 MB budgets enforced by dropping the oldest on purpose |
+| #50 | Peer tables grew without bound, and one was copied per packet | Both mutated in place and capped, oldest-first by Zeus's own receive order |
+| #51 | Docs described features that do not ship | `options.md` rewritten, ending with what is absent; route-tools page deleted |
 
-And beyond the review:
+## What the bench added, after that
 
-- **The Debug tab is Logs**, with Everything / Messages / Problems filters, and
-  **every message in and out is logged** — channel or station, byte count, SNR,
-  hops, never the text. Nothing logged an arrival before, which is why a silent
-  log could not distinguish "the node never decrypted it" from "Zeus filed it
-  somewhere unexpected".
-- **The version shows in the panel**, read from the manifest Zeus loaded rather
-  than a constant in the code. `plugin.json` is the only place it is written;
-  the build refuses to run if the two build files that copy it disagree.
-- **The preview harness and screenshot script now live in the repository**
-  (`--preview` on the test project, `tests/preview/screenshots.mjs`). Twenty-four
-  screenshots in about a minute, instead of rebuilding the harness every release.
+A day of real use on a busy mesh, in the order it was found:
+
+1. **Hashtag channels are case-sensitive.** `#test` and `#Test` derive
+   different keys and cannot hear each other. The join form now warns the
+   moment a `#` name is typed with a capital in it.
+2. **Newest message at the top**, like a mail client, with the "while Zeus was
+   closed" block below this session's traffic.
+3. **Clearing a long contact list buried the node.** Every removal re-read the
+   whole list — 323 removals meant 323 full dumps — and the first unanswered
+   keep-alive then ended the session, so the node appeared to vanish. Bulk
+   removal now paces itself, reads back once, and survives a node that falls
+   behind.
+4. **A full-list warning that contradicted itself** four seconds after the node
+   saved a new contact: it never checked whether recycling was on.
+5. **Push code 0x88 is the firmware's packet log**, pushed constantly. Ignored
+   now rather than drowning the Logs tab.
+6. **Contacts came back after being removed**, because the node re-adds every
+   station it hears. The Nodes tab now says so, counted from the node's own
+   announcements rather than inferred.
+7. **And then the setting itself.** `What this node saves by itself` on the
+   Nodes tab: the mode, the per-kind choices, and the hop limit. Written
+   against the firmware source, which showed that the per-kind bits are ignored
+   entirely unless the node is also made selective — so the obvious control
+   would have done nothing. See `docs/protocols/meshcore.md`.
 
 ## What to do next
 
-1. **Run 1.0.0 on the bench.** Install the delivered ZIP. The first thing worth
-   doing is the hashtag channel again, because the Logs tab can now answer it:
-   send on `#Test` from a station that genuinely holds that channel and look for
-   `RX Channel 1 ("#Test"): received N bytes`. Present means the node decrypted
-   it and Zeus filed it; absent means it never arrived in a form the node could
-   read, which on a channel is nearly always the two ends holding different keys.
-   Names are case-sensitive: `#test` and `#Test` are different channels.
-2. **Then publish**, with `docs/submission/`: `submit-1-release.ps1` creates the
-   release, `submit-2-registry.ps1` appends the version to the existing catalog
-   entry. Take the screenshots first and attach them.
-3. **A second Meshtastic node.** Meshtastic direct messages have still never run
-   over the air; the live node has heard no other Meshtastic station. That is the
-   largest untested area in the feature.
-4. **#45 Make the package byte-reproducible.** Rebuilding the same commit
-   produces a working but byte-different assembly, so a release ZIP can never be
-   regenerated. A trap for whoever cuts 1.0.1.
-5. **#41 A durable address book**, **#40 repeater health** (protocol understood,
-   2-hour polling, off by default), **#38 Meshtastic channels**, **#35 arrival
-   sound**, **#25**, **#27**.
+1. **Publish 1.0.1**, with `docs/submission/`. Take the screenshots
+   (`tests/preview/screenshots.mjs`) and attach them to the pull request.
+2. **A second Meshtastic node.** Meshtastic direct messages have still never
+   run over the air. That is the largest untested area in the feature.
+3. **#45 Make the package byte-reproducible**, so a release ZIP can be
+   regenerated. A trap for whoever cuts the next one.
+4. **#41 a durable address book**, **#40 repeater health**, **#38 Meshtastic
+   channels**, **#35 arrival sound**, **#25**, **#27**.
 
 ## The bench
 

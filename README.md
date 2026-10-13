@@ -3,10 +3,10 @@
 Read, send and reply to **Meshtastic** and **MeshCore** text messages from
 inside Zeus, through LoRa nodes (such as a Heltec V4) on your Wi-Fi.
 
-> Status: 1.0.0. Both connectors are implemented and tested against real
-> hardware — a Heltec V4 running MeshCore companion Wi-Fi firmware and another
-> running Meshtastic — as well as against simulated nodes in the test suite.
-> 0.4.1 is the version listed in the Zeus community catalog.
+> Status: 1.0.1, built and bench-tested on real hardware — a Heltec V4 running
+> MeshCore companion Wi-Fi firmware and another running Meshtastic — as well as
+> against simulated nodes in the test suite. 0.4.1 is the version currently
+> listed in the Zeus community catalog.
 
 User help: [docs/help](docs/help/README.md), including an
 [options reference](docs/help/options.md) that says what every setting does

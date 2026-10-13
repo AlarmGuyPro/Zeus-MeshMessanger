@@ -1,12 +1,12 @@
 diff --git a/registry.json b/registry.json
-index e34fcc7..8de213d 100644
+index e34fcc7..d06a3de 100644
 --- a/registry.json
 +++ b/registry.json
 @@ -1,6 +1,6 @@
  {
    "schemaVersion": 1,
 -  "generated": "2026-10-12T16:01:43Z",
-+  "generated": "2026-10-13T16:37:12Z",
++  "generated": "2026-10-13T22:32:05Z",
    "plugins": [
      {
        "id": "com.openhpsdr.zeus.plugins.localsignon",
@@ -16,18 +16,18 @@ index e34fcc7..8de213d 100644
            }
 +        },
 +        {
-+          "version": "1.0.0",
++          "version": "1.0.1",
 +          "sdkAbi": 1,
 +          "sdkMinVersion": "1.5.0",
 +          "platforms": [
 +            "any"
 +          ],
-+          "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip",
-+          "sha256": "bbb345149e35fed650467243581e8e0f908f26d2d3321289cecdbe39742b9986",
++          "downloadUrl": "https://github.com/Zeus-SDR/zeus-community-features/releases/download/community-io.github.alarmguypro.meshmessenger-v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip",
++          "sha256": "abddb23cce3ef7478543c384b6dd96b0af58e387d566802478b961b226c5d36b",
 +          "source": {
 +            "repository": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger",
-+            "commit": "986bbd9bb6273e4fbcb921110b5cb5adfab4d95e",
-+            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip"
++            "commit": "21a07e23ffed0e49469886e9b6204e3ef6e3ee7b",
++            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip"
 +          }
          }
        ]
