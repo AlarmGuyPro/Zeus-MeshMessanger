@@ -18,13 +18,41 @@ catalog. Read this first when picking the project back up.
 | Source rebuild | passed |
 | Tests | 32/32 |
 
-Two checks on the PR are red and **neither is ours**: the custody download
-404s until a maintainer mirrors the package, which the contributing guide says
-to expect, and one Windows leg of a job that doesn't read `registry.json` went
-flaky. Both are explained in a comment on the PR.
+Two checks on the PR were red and neither was ours: the custody download 404s
+until a maintainer mirrors the package, which the contributing guide says to
+expect, and one Windows leg of the catalog's own scanner self-test went flaky.
+Both are explained in a comment on the PR.
 
-**Nothing is outstanding on the submission.** The next move belongs to a
-maintainer.
+**0.4.1 shipped in the Zeus release of 12 October**, so it is in strangers'
+hands now.
+
+## The review, and what it means for 1.0
+
+A maintainer reviewed PR #19 and returned six findings. All six were confirmed
+against the code; they are tasks **#47 to #51** and they all block 1.0 (#46).
+A reply accepting them has been posted.
+
+| | Finding | Shape |
+|---|---|---|
+| #47 | A MeshCore channel index that is not a real slot casts to a byte and transmits on the public channel | On-air correctness. Not reachable from the panel, only by a direct API call |
+| #48 | Four security mutations, including allowing loopback, left all 32 tests passing | The important one. See below |
+| #49 | The whole history is one settings value rewritten every 2 s; past ~16 MB the host deletes the old value first, so it is lost | Largest piece of work |
+| #50 | `_heard` and `_nodes` grow without bound; the Meshtastic map is copied per packet | Memory on busy or MQTT-bridged meshes |
+| #51 | `options.md` documents rooms, traceroute, path tools and repeater status, none of which ship; and the PR text wrongly says channel keys are persisted | Ours to own |
+
+**#48 is the one to take first.** The others are defects. That one says the
+test suite does not protect the properties the submission claims in writing:
+the harness sets `AllowLoopback = true` globally because the fake nodes listen
+on loopback, so the refusal path is never exercised. Their four mutations
+become our acceptance test — each must turn the suite red.
+
+Two of the findings are worth remembering as patterns rather than bugs. In
+#47, the correct slot check already existed twenty lines away in `TitleFor`:
+the code validated an index when displaying a name and not when keying a
+transmitter. In #51, `options.md` had been describing features that did not
+exist since before the playbook warned against exactly that.
+
+Nothing in the set warranted a hotfix for people who installed 0.4.1 today.
 
 Every test build lives on the `builds` branch, newest first, with a SHA-256
 beside each. Archives are kept off `main` because the catalog's rebuild check
@@ -63,10 +91,15 @@ list and mDNS discovery.
 
 ## What to do next
 
-Run `TaskList` for the live list. As of this writing, in the order I would
-take them:
+Run `TaskList` for the live list. **The five review items (#47–#51) come
+first** — they are conditions of the listing, not options. #48 before the rest.
 
-1. **#39 Show the plugin version in the panel.** Small, and every bug report
+Then, still inside 1.0:
+
+1. **A second Meshtastic node.** Direct messages on that network have never
+   run over the air; the live node has heard no other Meshtastic station. A
+   two-network feature calling itself 1.0 should have sent a real one.
+2. **#39 Show the plugin version in the panel.** Small, and every bug report
    from here on wants it. The version currently lives in four files that must
    be bumped together, which is three too many.
 2. **#45 Make the package byte-reproducible.** Rebuilding the same commit
