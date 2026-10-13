@@ -314,6 +314,13 @@ function Thread(props: {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const thread = useRef<HTMLDivElement | null>(null);
+
+  // Newest is at the top, so "show me what just happened" means the top of the list.
+  // Opening a conversation and sending both go there; an arrival while the operator is
+  // reading older traffic deliberately leaves the scroll alone.
+  const toNewest = () => thread.current?.scrollTo({ top: 0 });
+  useEffect(toNewest, [conversation.id]);
 
   const bytes = utf8Length(draft.trim());
   const max = node ? textLimit(node, conversation.kind) : 0;
@@ -328,7 +335,10 @@ function Thread(props: {
     try {
       // Only the conversation id is sent; the backend decides which node transmits.
       const result = await client.reply(conversation.id, draft);
-      if (result.ok) setDraft("");
+      if (result.ok) {
+        setDraft("");
+        toNewest();
+      }
       else setSendError(result.error ?? "Send failed.");
     } catch (err) {
       setSendError(errorText(err));
@@ -338,8 +348,14 @@ function Thread(props: {
   };
 
   const list = messages.kind === "ready" ? messages.data : [];
-  const firstLive = list.findIndex((m) => !m.queuedWhileAway);
   const hasQueued = list.some((m) => m.queuedWhileAway);
+  // Newest at the top, the way a mail client reads: what just arrived is where you are
+  // already looking, and older traffic is below rather than off the bottom of a long thread.
+  // The store keeps them oldest-first, so the reversal is purely for display.
+  const newestFirst = useMemo(() => list.slice().reverse(), [list]);
+  // In this order the queued block sits underneath, so the marker goes on the first
+  // message that was waiting when Zeus opened.
+  const firstQueued = newestFirst.findIndex((m) => m.queuedWhileAway);
   const failedCount = list.filter(
     (m) => m.direction === "outbound" && (m.status === "failed" || m.status === "notconfirmed"),
   ).length;
@@ -449,7 +465,7 @@ function Thread(props: {
         </div>
       )}
 
-      <div className={cx("messages")} aria-live="polite">
+      <div className={cx("messages")} ref={thread} aria-live="polite" aria-label="Messages, newest first">
         {messages.kind === "loading" && <p className={cx("muted")}>Loading messages…</p>}
         {messages.kind === "error" && (
           <p className={`${cx("notice")} ${cx("notice--warn")}`} role="alert">
@@ -463,13 +479,15 @@ function Thread(props: {
               : "No messages yet."}
           </p>
         )}
-        {hasQueued && <div className={cx("divider")}>Received while Zeus was closed</div>}
-        {list.map((m, i) => {
+        {hasQueued && firstQueued !== 0 && <div className={cx("divider")}>Since Zeus connected</div>}
+        {newestFirst.map((m, i) => {
           const s = statusLine(m);
           const rx = receptionLine(m);
           return (
             <div key={m.id} style={{ display: "contents" }}>
-              {hasQueued && i === firstLive && i > 0 && <div className={cx("divider")}>Since Zeus connected</div>}
+              {hasQueued && i === firstQueued && (
+                <div className={cx("divider")}>Received while Zeus was closed</div>
+              )}
               <div
                 className={`${cx("msg")} ${m.direction === "outbound" ? cx("msg--out") : ""} ${
                   m.status === "failed" || m.status === "notconfirmed" ? cx("msg--failed") : ""

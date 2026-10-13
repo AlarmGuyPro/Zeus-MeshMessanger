@@ -36,7 +36,17 @@ accented letters and emoji take 2–4 bytes each.
 Mesh Messenger blocks a message that's too long instead of letting the
 firmware cut it off silently.
 
+## The newest message is at the top
+
+A conversation reads like a mail client, not a chat window: the most recent
+message is at the top and older traffic is below it. What just arrived is
+where you are already looking, and a long thread never pushes it off the
+bottom of the screen. Opening a conversation, and sending, both take you to
+the top; a message arriving while you are reading older traffic leaves your
+place alone.
+
 ## Messages that arrived while Zeus was closed
 
-They're marked as such and keep their original time. See [When Zeus is
-closed](offline.md).
+They're marked as such and keep their original time — the block sits below
+the traffic from this session, under **Received while Zeus was closed**. See
+[When Zeus is closed](offline.md).
