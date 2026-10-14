@@ -25,10 +25,21 @@ in particular should never be submitted — it carries the channel crash below.
 | Tests | 55/55 |
 | Mutation check | all four of the maintainer's mutations turn the suite red |
 
-**Nothing is published yet.** `docs/submission/` is ready: `submit-1-release.ps1`
-cuts the release, `submit-2-registry.ps1` appends the version to the existing
-catalog entry and refuses to proceed if the published 0.4.1 object does not
-survive its own edit. Take the screenshots first and attach them.
+**1.0.3 is released, and the catalog entry is the step in flight.**
+`submit-1-release.ps1` published
+[v1.0.3](https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/tag/v1.0.3)
+on 14 October; the ZIP is reachable and its hash matches the table above.
+`submit-2-registry.ps1` appends the version to the existing catalog entry and
+refuses to proceed if the published 0.4.1 object does not survive its own edit.
+
+Its first run stopped at the custody test with "A listing PR must advance the
+generated timestamp". That was the script's own doing and is fixed: it stamped
+`generated` with the current second, and `test-community-custody.ps1` stamps its
+fixture the same way and demands its own be strictly later, so the two tied. The
+stamp is now set two minutes back, and the script restores `registry.json` from the
+source remote before editing so a re-run starts from the catalog's copy rather than
+its own. Both paths were tested against a clone of the catalog at
+`87c3d0f`. See section 8 of the playbook.
 
 ## What 1.0 answered from the review
 
@@ -123,8 +134,10 @@ to take its host's window down, and it costs nothing to make sure it cannot.
 
 ## What to do next
 
-1. **Publish 1.0.1**, with `docs/submission/`. Take the screenshots
-   (`tests/preview/screenshots.mjs`) and attach them to the pull request.
+1. **Finish the catalog pull request.** The release is out; what is left is
+   `submit-2-registry.ps1` to push the branch, then `gh pr create` with
+   `PULL-REQUEST.md` as the body and the 24 screenshots attached. They are
+   required review evidence, not a nicety.
 2. **A second Meshtastic node.** Meshtastic direct messages have still never
    run over the air. That is the largest untested area in the feature.
 3. **#45 Make the package byte-reproducible**, so a release ZIP can be

@@ -205,6 +205,22 @@ If you script the registry edit on Windows, **normalise line endings on read**.
 Git hands you a CRLF working copy, and a search for the end of the array using
 LF finds nothing.
 
+**Do not stamp `generated` with the current second.** `test-community-custody.ps1`
+builds its own fixture submission on top of whatever `registry.json` is in the tree,
+stamps that fixture with `UtcNow` to the second, and then asserts the fixture's
+timestamp is *strictly later* than the one it built on. Stamp your edit with `UtcNow`
+and the two tie on the second — the test fails with **"A listing PR must advance the
+generated timestamp"**, which reads as a complaint about your edit and is nothing of
+the kind. It is also environment-dependent: a slower machine inserts enough delay to
+pass, which is why the same edit can pass in one checkout and fail in another. Stamp
+it a minute or two in the past. The real check compares against the catalog's own
+`generated`, which is days old, so being slightly behind now costs nothing.
+
+**And make the edit script re-runnable.** It must restore `registry.json` from the
+source remote before editing, or a second run finds the version already listed and
+stops — a failure invented entirely by the first run. Same shape as the rebuild-check
+trap at the end of this file: the retry breaks on the previous attempt's leftovers.
+
 ## 9. Documentation discipline
 
 Write the operator help as the feature ships, not before. Ours described

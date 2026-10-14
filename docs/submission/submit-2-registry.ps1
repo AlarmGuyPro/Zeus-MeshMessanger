@@ -111,6 +111,19 @@ Write-Host "  On branch $branch" -ForegroundColor Green
 $registryPath = Join-Path $clone 'registry.json'
 if (-not (Test-Path -LiteralPath $registryPath)) { Pop-Location; Fail 'registry.json is not in the clone.' }
 
+# A re-run has to start from the catalog's own registry.json, not from the copy a
+# previous attempt already edited. Nothing is committed until the end of this
+# script, so while the branch still points at the source remote's main the file can
+# simply be restored; once a commit exists, leave it alone and let the check below
+# explain itself.
+$head = (git rev-parse HEAD 2>$null | Select-Object -First 1)
+$sourceHead = (git rev-parse "$sourceRemote/main" 2>$null | Select-Object -First 1)
+if ($head -and $sourceHead -and "$head".Trim() -eq "$sourceHead".Trim()) {
+    git restore --source "$sourceRemote/main" -- registry.json 2>&1 | Write-Host
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'Could not restore registry.json from the source remote.' }
+    Write-Host "  registry.json restored from $sourceRemote/main before editing."
+}
+
 # Normalised to LF. Git hands Windows a CRLF working copy, which would stop the
 # insertion below from finding its anchor. Git normalises again on commit, so
 # writing LF back keeps the diff clean.
@@ -128,7 +141,19 @@ if ($registry -match [regex]::Escape("`"version`": `"$Version`"") -and
     if ($entryEnd -lt 0) { $entryEnd = $registry.Length }
     if ($registry.Substring($entryStart, $entryEnd - $entryStart) -match [regex]::Escape("`"version`": `"$Version`"")) {
         Pop-Location
-        Fail "registry.json already lists $FeatureId $Version. Nothing was changed."
+        Fail @"
+registry.json already lists $FeatureId $Version, and this branch already carries a
+commit, so the edit was not repeated and nothing was changed.
+
+If that commit is the one you want, it only needs pushing:
+
+  git -C "$clone" push -u origin $branch
+
+To start the branch over instead, delete it and run this script again:
+
+  git -C "$clone" switch --detach $sourceRemote/main
+  git -C "$clone" branch -D $branch
+"@
     }
 }
 
@@ -177,7 +202,16 @@ $addition = @"
 
 $updated = $registry.Replace($anchor, $addition)
 
-$stamp = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+# Two minutes back, on purpose, and the reason is the custody test rather than
+# taste. tools/test-community-custody.ps1 builds its own fixture submission on top
+# of whatever registry.json is in the tree and stamps that fixture with UtcNow to
+# the second, then asserts the fixture's timestamp is STRICTLY LATER than the one it
+# built on. A registry.json stamped with UtcNow moments earlier ties on the second —
+# or wins, if the clock moves — and the test fails with "A listing PR must advance
+# the generated timestamp", which reads like a complaint about this edit and is not.
+# Anything from today still advances the catalog's own timestamp, which is what the
+# real check compares against, so the two minutes cost nothing.
+$stamp = [DateTime]::UtcNow.AddMinutes(-2).ToString('yyyy-MM-ddTHH:mm:ssZ')
 $updated = [regex]::Replace($updated, '"generated"\s*:\s*"[^"]*"', """generated"": ""$stamp""", 1)
 
 if ($updated -eq $registry) { Pop-Location; Fail 'Nothing was changed — the edit did not apply. Add the version by hand instead.' }
