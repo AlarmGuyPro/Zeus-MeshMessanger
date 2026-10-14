@@ -1,7 +1,8 @@
 # Where this project stands
 
-Last updated 13 October 2026, with 1.0.3 built, gated and bench-tested.
-Read this first when picking the project back up.
+Last updated 14 October 2026. 1.0.3 is released and submitted to the catalog;
+[PR #22](https://github.com/Zeus-SDR/zeus-community-features/pull/22) is open and
+waiting on maintainer review. Read this first when picking the project back up.
 
 ## Shipped, and listed
 
@@ -10,9 +11,25 @@ Read this first when picking the project back up.
 merged and the package is mirrored into custody. It shipped in the Zeus
 release of 12 October.
 
-**1.0.3 is the one to submit.** 1.0.0 to 1.0.2 were built and gated but never
-released: each was superseded within hours by something a bench found. 1.0.2
-in particular should never be submitted — it carries the channel crash below.
+**1.0.3 is submitted.** PR #22 carries one commit changing one file,
+`registry.json`, +16/−1, with 1.0.3 prepended to the existing entry's `versions`
+array and the published 0.4.1 object untouched. The 24 screenshots are attached in
+a comment. Thirteen checks ran:
+
+| | |
+|---|---|
+| Trusted community submission policy | pass |
+| Package security scan | CLEAR for 1.0.3 — download, ClamAV and OSV all passed |
+| Source rebuild matches package | pass, both jobs |
+| Schema, SDK and tooling (eight jobs) | pass |
+| HTTPS, checksum | **fails, and is expected to** — `downloadUrl` points at Zeus-SDR and 404s until a maintainer mirrors the package into custody. CONTRIBUTING says contributors are not expected to make it pass; the PR body says so too. |
+
+Nothing further is ours to do on it. What a maintainer does next is mirror the
+package and merge.
+
+**1.0.0 to 1.0.2 were built and gated but never released:** each was superseded
+within hours by something a bench found. 1.0.2 in particular should never be
+submitted — it carries the channel crash below.
 
 | | |
 |---|---|
@@ -25,16 +42,13 @@ in particular should never be submitted — it carries the channel crash below.
 | Tests | 55/55 |
 | Mutation check | all four of the maintainer's mutations turn the suite red |
 
-**1.0.3 is released, and the catalog entry is the step in flight.**
+## What the submission itself cost
+
 `submit-1-release.ps1` published
 [v1.0.3](https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/tag/v1.0.3)
-on 14 October; the ZIP is reachable and its hash matches the table above.
-`submit-2-registry.ps1` appends the version to the existing catalog entry and
-refuses to proceed if the published 0.4.1 object does not survive its own edit.
-
-The submission took two corrections, both in the script and both now fixed. They are
-worth reading before the next version goes out, because each one passed every local
-gate first. Section 8 of the playbook carries them.
+first time. `submit-2-registry.ps1` took four corrections, and every one of them
+is worth reading before the next version goes out, because each passed every local
+gate before failing. Section 8 of the playbook carries them.
 
 **The `generated` stamp tied with the custody test.** `test-community-custody.ps1`
 builds its own fixture submission on top of whatever `registry.json` is in the tree,
@@ -68,8 +82,18 @@ anything: a copy that is not provably the same blob skips the check with a warni
 rather than failing the submission. `diagnose-submission.ps1` prints what the
 comparison sees, and was what found this.
 
-All three fixes were tested against a clone of the catalog at `87c3d0f`, including a
-re-run over the branch as the first attempt left it.
+**And the push was rejected as a non-fast-forward.** The force-push was conditional
+on this run having rewound the branch, but the rewind had happened in the run before,
+so the script pushed plainly while the fork still held the commit that rewind
+abandoned. Whether the remote has to be replaced is a question about the remote's
+tip, so the script now fetches `origin`, replaces the branch only when its tip is
+this script's own commit, and pins `--force-with-lease` to the tip it read.
+
+All four fixes were tested against a clone of the catalog at `87c3d0f` and a bare
+fork holding the abandoned commit, including a re-run over the branch exactly as the
+previous attempt left it. A fifth lesson, and a cheap one: **a re-run is a first-class
+case.** Three of the four corrections had to cope with the leftovers of the attempt
+before, and the same trap sits at the end of this file for the rebuild check.
 
 ## What 1.0 answered from the review
 
@@ -164,10 +188,11 @@ to take its host's window down, and it costs nothing to make sure it cannot.
 
 ## What to do next
 
-1. **Finish the catalog pull request.** The release is out; what is left is
-   `submit-2-registry.ps1` to push the branch, then `gh pr create` with
-   `PULL-REQUEST.md` as the body and the 24 screenshots attached. They are
-   required review evidence, not a nicety.
+1. **Watch PR #22 for review comments.** `gh pr checks 22 --repo
+   Zeus-SDR/zeus-community-features` and `gh pr view 22 --repo
+   Zeus-SDR/zeus-community-features --comments`. The #19 review found four real
+   defects, so expect the same scrutiny and answer it the same way: confirm each
+   finding against the code before fixing it.
 2. **A second Meshtastic node.** Meshtastic direct messages have still never
    run over the air. That is the largest untested area in the feature.
 3. **#45 Make the package byte-reproducible**, so a release ZIP can be
