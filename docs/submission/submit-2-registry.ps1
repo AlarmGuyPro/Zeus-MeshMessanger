@@ -338,9 +338,41 @@ if (-not $Force) {
 git add registry.json
 git commit -m $commitMessage
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'The commit failed.' }
-# A rewound branch needs the remote's copy replaced rather than added to, and
-# --force-with-lease refuses if anything arrived on it that this clone has not seen.
-if ($rewound) { git push --force-with-lease -u origin $branch }
+
+# Whether the remote branch has to be replaced rather than added to is a question
+# about the remote's tip, not about what this run did locally: a rewind in an
+# EARLIER run leaves the fork holding a commit nothing here builds on any more, and
+# a plain push is then rejected as a non-fast-forward.
+git fetch origin 2>&1 | Out-Null
+$remoteTip = "$(git rev-parse --verify --quiet "refs/remotes/origin/$branch")".Trim()
+$replaceRemote = $false
+if ($remoteTip) {
+    git merge-base --is-ancestor $remoteTip HEAD 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        # Only this script's own commits may be replaced. Anything else on the fork's
+        # branch is someone's work and is left for a person to sort out.
+        $remoteSubjects = @(git log --format=%s "HEAD..$remoteTip" 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+        $foreignRemote = @($remoteSubjects | Where-Object { $_ -cne $commitMessage })
+        if ($foreignRemote.Count -gt 0) {
+            Pop-Location
+            Fail @"
+The branch on your fork has $($remoteSubjects.Count) commit(s) this clone does not build on,
+and at least one is not from this script:
+
+  $($foreignRemote -join "`n  ")
+
+Nothing was pushed. The commit here is ready; decide which one you want and push
+it yourself, or delete the fork's branch and run this again.
+"@
+        }
+        $replaceRemote = $true
+        Write-Host "  The fork's branch carries this script's earlier commit; replacing it." -ForegroundColor Yellow
+    }
+}
+
+# --force-with-lease pinned to the tip we just read, so the push refuses if anything
+# arrives on that branch between now and then.
+if ($replaceRemote) { git push --force-with-lease="${branch}:${remoteTip}" -u origin $branch }
 else { git push -u origin $branch }
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'The push failed.' }
 
