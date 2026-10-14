@@ -38,7 +38,7 @@ submitted — it carries the channel crash below.
 | Package validation | pass |
 | Security scan | CLEAR, 0 fail, 0 review |
 | Source rebuild | clear, from a clean clone of the pinned commit |
-| Registry edit | `validate-registry` and `test-community-custody` pass with 1.0.1 appended; the exact diff is `docs/submission/registry-1.0.3.patch` |
+| Registry edit | 1.0.3 **prepended** to the existing entry, which is the rule the catalog enforces; its submission policy, registry validation and custody tests all pass, and the exact diff is `docs/submission/registry-1.0.3.patch` |
 | Tests | 55/55 |
 | Mutation check | all four of the maintainer's mutations turn the suite red |
 
