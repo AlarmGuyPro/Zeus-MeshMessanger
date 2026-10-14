@@ -116,15 +116,26 @@ targets it for you.
    the check the pull request runs and the only one that compares your file against
    the catalog's:
    ```powershell
-   git show upstream/main:registry.json > ..\base-registry.json
+   Start-Process git -ArgumentList 'show','upstream/main:registry.json' `
+     -NoNewWindow -Wait -RedirectStandardOutput ..\base-registry.json
+   git hash-object ..\base-registry.json
+   git rev-parse upstream/main:registry.json
    pwsh tools/validate-community-submission.ps1 -BaseRegistryPath ..\base-registry.json `
      -CandidateRegistryPath registry.json `
      -ExpectedFeatureId io.github.alarmguypro.meshmessenger -ExpectedVersion 1.0.3
    pwsh tools/validate-registry.ps1
    pwsh tools/test-community-custody.ps1
    ```
-   The other two read your file on its own, or use it as the base of their own
-   fixture, so a version in the wrong position passes both of them.
+   The two hashes must match. Write that base file with `git show ... > file` or any
+   PowerShell pipeline instead, and the bytes are decoded with the console code page:
+   registry.json carries em dashes and middle dots in several descriptions, those
+   features then look changed, and the check fails naming entries you never touched.
+
+   The last two validators read your file on its own, or use it as the base of their
+   own fixture, so a version in the wrong position passes both of them.
+   `diagnose-submission.ps1` prints what the comparison sees when it does reject
+   something: the plugin counts, the ids added or missing, every feature it considers
+   changed and which property differs in each.
 5. **Commit, push, open the pull request**, paste `PULL-REQUEST.md` as the
    body, and **attach the screenshots**. The guide is explicit that they are
    required review evidence and that saying the UI was tested is not a

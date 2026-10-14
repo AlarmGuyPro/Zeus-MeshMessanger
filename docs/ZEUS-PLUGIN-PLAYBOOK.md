@@ -204,10 +204,24 @@ direction only in the "Trusted community submission policy" job on the pull requ
 Run it yourself before pushing:
 
 ```powershell
-git show upstream/main:registry.json > ..\base-registry.json
+Start-Process git -ArgumentList 'show','upstream/main:registry.json' `
+  -NoNewWindow -Wait -RedirectStandardOutput ..\base-registry.json
+git hash-object ..\base-registry.json          # must equal the next line
+git rev-parse upstream/main:registry.json
 pwsh tools/validate-community-submission.ps1 -BaseRegistryPath ..\base-registry.json `
   -CandidateRegistryPath registry.json -ExpectedFeatureId <id> -ExpectedVersion <version>
 ```
+
+**Do not write that base file with `git show ... > file` or a pipeline.** PowerShell
+decodes a child process's output using the console code page, and registry.json
+carries em dashes and middle dots in several features' descriptions. On a Windows
+console those come back mangled, so the comparison sees *every* feature containing
+one as changed and fails with "A listing PR must add exactly one feature or one
+version without changing anything else" — naming entries the edit never touched.
+`Start-Process -RedirectStandardOutput` lets the operating system write git's bytes
+to the file, and the two hashes above prove the copy is the same blob before
+anything is concluded from comparing against it. The same trap applies to any
+non-ASCII content read back through a PowerShell pipeline.
 
 **`downloadUrl` points at Zeus-SDR and will 404.** That is correct. Your own
 release URL goes in `source.package`. The HTTPS/checksum check downloads

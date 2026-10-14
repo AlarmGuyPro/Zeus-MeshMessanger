@@ -267,22 +267,42 @@ if (Test-Path -LiteralPath $submissionCheck) {
     Write-Host ''
     Write-Host 'Running tools/validate-community-submission.ps1 against the catalog main ...'
     $baseCopy = Join-Path ([IO.Path]::GetTempPath()) "zeus-base-registry-$([Guid]::NewGuid().ToString('N')).json"
-    $baseText = (git show "${sourceRemote}/main:registry.json" | Out-String)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($baseText)) {
-        Pop-Location
-        Fail "Could not read registry.json from $sourceRemote/main to compare against."
+
+    # git's stdout is redirected to the file by the operating system rather than read
+    # through PowerShell. A pipeline would decode those bytes using the console's code
+    # page, and registry.json holds em dashes and middle dots in six other features'
+    # descriptions: on a Windows console they come back mangled, the check then sees
+    # seven changed features instead of one, and it fails with "A listing PR must add
+    # exactly one feature or one version without changing anything else" — a complaint
+    # about six entries this edit never touched.
+    $git = Start-Process -FilePath 'git' -WorkingDirectory $clone -Wait -PassThru -NoNewWindow `
+        -ArgumentList @('show', "${sourceRemote}/main:registry.json") `
+        -RedirectStandardOutput $baseCopy
+
+    # And the copy has to be provably the same blob before anything is concluded from
+    # comparing against it. git hashes the file we just wrote and the blob it came
+    # from; if those differ, this one check is skipped rather than trusted.
+    $writtenHash = if ($git.ExitCode -eq 0 -and (Test-Path -LiteralPath $baseCopy)) { "$(git hash-object $baseCopy)".Trim() } else { '' }
+    $blobHash = "$(git rev-parse "${sourceRemote}/main:registry.json")".Trim()
+
+    if ($writtenHash -and $blobHash -and $writtenHash -eq $blobHash) {
+        & pwsh -NoProfile -File $submissionCheck `
+            -BaseRegistryPath $baseCopy `
+            -CandidateRegistryPath $registryPath `
+            -ExpectedFeatureId $FeatureId `
+            -ExpectedVersion $Version
+        $submissionExit = $LASTEXITCODE
+        Remove-Item -LiteralPath $baseCopy -ErrorAction SilentlyContinue
+        if ($submissionExit -ne 0) {
+            Pop-Location
+            Fail 'The catalog submission policy rejected the change. Nothing has been committed; the message above says why.'
+        }
     }
-    [IO.File]::WriteAllText($baseCopy, $baseText, [Text.UTF8Encoding]::new($false))
-    & pwsh -NoProfile -File $submissionCheck `
-        -BaseRegistryPath $baseCopy `
-        -CandidateRegistryPath $registryPath `
-        -ExpectedFeatureId $FeatureId `
-        -ExpectedVersion $Version
-    $submissionExit = $LASTEXITCODE
-    Remove-Item -LiteralPath $baseCopy -ErrorAction SilentlyContinue
-    if ($submissionExit -ne 0) {
-        Pop-Location
-        Fail 'The catalog submission policy rejected the change. Nothing has been committed; the message above says why.'
+    else {
+        Remove-Item -LiteralPath $baseCopy -ErrorAction SilentlyContinue
+        Write-Host '  SKIPPED: could not reproduce main''s registry.json byte for byte here,' -ForegroundColor Yellow
+        Write-Host '  so this check would be comparing against something other than main.' -ForegroundColor Yellow
+        Write-Host '  The pull request runs it either way; the gates below still apply.' -ForegroundColor Yellow
     }
 }
 

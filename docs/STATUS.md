@@ -55,7 +55,20 @@ ever compares our edit against the catalog's main. The script now prepends, refu
 to write if the new version is not `versions[0]`, and runs
 `validate-community-submission.ps1` in the direction CI runs it before committing.
 
-Both fixes were tested against a clone of the catalog at `87c3d0f`, including a
+**And the policy check I added then failed on Windows for a reason of its own.** It
+built its copy of main's `registry.json` by piping `git show` through PowerShell,
+which decodes a child process's output using the console code page. `registry.json`
+carries em dashes and middle dots in six other features' descriptions, so on a
+Windows console those six came back mangled and the check saw seven changed features
+instead of one — failing with "A listing PR must add exactly one feature or one
+version without changing anything else", naming entries the edit never touched. git
+now writes that file itself through `Start-Process -RedirectStandardOutput`, and the
+script compares `git hash-object` against the blob's own hash before concluding
+anything: a copy that is not provably the same blob skips the check with a warning
+rather than failing the submission. `diagnose-submission.ps1` prints what the
+comparison sees, and was what found this.
+
+All three fixes were tested against a clone of the catalog at `87c3d0f`, including a
 re-run over the branch as the first attempt left it.
 
 ## What 1.0 answered from the review
