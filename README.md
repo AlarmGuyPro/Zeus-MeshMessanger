@@ -6,7 +6,7 @@ source tree.
 
 | Version | Built from | Status |
 |---------|-----------|--------|
-| [v1.0.3](v1.0.3/io.github.alarmguypro.meshmessenger-1.0.3.zip) | main @ 8e21064 | **The one to submit.** Fixes a crash that took Zeus's workspace down when you opened a second channel, and adds a panel error boundary so a fault can never do that again |
+| [v1.0.3](v1.0.3/io.github.alarmguypro.meshmessenger-1.0.3.zip) | main @ 8e21064 | **Released, and submitted to the catalog** ([PR #22](https://github.com/Zeus-SDR/zeus-community-features/pull/22)). This ZIP is byte-identical to the released one, so take it rather than rebuilding: packaging is not byte-reproducible yet (#45). The [24 review screenshots](v1.0.3/meshmessenger-1.0.3-screenshots.zip) are beside it. Fixes a crash that took Zeus's workspace down when you opened a second channel, and adds a panel error boundary so a fault can never do that again |
 | v1.0.2 | main @ 808ee14 | **Do not use.** Contains the channel crash; only adds the error boundary that found it |
 | [v1.0.1](v1.0.1/io.github.alarmguypro.meshmessenger-1.0.1.zip) | main @ 21a07e2 | **Do not use.** Crashes Zeus when you open a second channel. Everything in 1.0.0 plus seven findings from a day on a busy mesh: hashtag case warning, newest-message-first, bulk contact removal that doesn't bury the node, and a control for what the node saves by itself |
 | [v1.0.0](v1.0.0/io.github.alarmguypro.meshmessenger-1.0.0.zip) | main @ 986bbd9 | All six maintainer review findings answered; Logs tab, which records every message in and out; version shown in the panel |
