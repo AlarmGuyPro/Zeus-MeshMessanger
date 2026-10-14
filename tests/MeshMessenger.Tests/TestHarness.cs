@@ -88,12 +88,43 @@ public sealed class MemorySettings : IPluginSettings
 
 public sealed class FakePluginContext : IPluginContext
 {
+    /// <summary>
+    /// The real version from plugin.json when it can be found, so the preview — and the
+    /// screenshots taken from it — show the version actually being built rather than a
+    /// placeholder a reviewer would have to take on trust. Falls back for the test suite,
+    /// which only needs the value to be consistent.
+    /// </summary>
+    public static readonly string ManifestVersion = ReadManifestVersion();
+
+    private static string ReadManifestVersion()
+    {
+        try
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null)
+            {
+                var manifest = Path.Combine(dir.FullName, "src", "MeshMessenger", "plugin.json");
+                if (File.Exists(manifest))
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifest));
+                    if (doc.RootElement.TryGetProperty("version", out var v) && v.GetString() is { } s) return s;
+                }
+                dir = dir.Parent;
+            }
+        }
+        catch (Exception)
+        {
+            // The suite does not care which version it sees, only that it is consistent.
+        }
+        return "0.0.0-test";
+    }
+
     public string PluginId => "io.github.alarmguypro.meshmessenger";
     public PluginManifest Manifest { get; } = new()
     {
         Id = "io.github.alarmguypro.meshmessenger",
         Name = "Mesh Messenger",
-        Version = "0.0.0-test",
+        Version = ManifestVersion,
         Sdk = new SdkRequirement { Abi = 1, MinVersion = "1.5.0" },
         Entrypoint = new EntryPoint { Assembly = "MeshMessenger.dll" },
     };
