@@ -100,16 +100,31 @@ targets it for you.
    ```
    If `git remote -v` names the source remote something other than `upstream`,
    use the name it actually shows. Don't guess.
-3. **Edit registry.json, and nothing else.** Append the object from
-   `REGISTRY-ENTRY.json` to the **existing** entry's `versions` array, after
-   the 0.4.1 object, and set the top-level `generated` field to the current UTC
-   RFC 3339 timestamp. `registry-1.0.3.patch` is the exact diff. Leave every
-   other entry, and the 0.4.1 object, untouched.
-4. **Validate** before committing:
+3. **Edit registry.json, and nothing else.** Insert the object from
+   `REGISTRY-ENTRY.json` as the **first** element of the existing entry's
+   `versions` array — before the 0.4.1 object, not after it — and set the
+   top-level `generated` field to a UTC RFC 3339 timestamp a minute or two in
+   the past. `registry-1.0.3.patch` is the exact diff. Leave every other entry,
+   and the 0.4.1 object, untouched.
+
+   Both of those are rules rather than style. `validate-community-submission.ps1`
+   throws "A release PR must prepend exactly one new immutable version" unless the
+   new version is `versions[0]`, and the custody test stamps its own fixture with
+   the current second and demands it be strictly later than yours, so a `generated`
+   of right now ties with it.
+4. **Validate** before committing. Run the submission policy first, because it is
+   the check the pull request runs and the only one that compares your file against
+   the catalog's:
    ```powershell
+   git show upstream/main:registry.json > ..\base-registry.json
+   pwsh tools/validate-community-submission.ps1 -BaseRegistryPath ..\base-registry.json `
+     -CandidateRegistryPath registry.json `
+     -ExpectedFeatureId io.github.alarmguypro.meshmessenger -ExpectedVersion 1.0.3
    pwsh tools/validate-registry.ps1
    pwsh tools/test-community-custody.ps1
    ```
+   The other two read your file on its own, or use it as the base of their own
+   fixture, so a version in the wrong position passes both of them.
 5. **Commit, push, open the pull request**, paste `PULL-REQUEST.md` as the
    body, and **attach the screenshots**. The guide is explicit that they are
    required review evidence and that saying the UI was tested is not a

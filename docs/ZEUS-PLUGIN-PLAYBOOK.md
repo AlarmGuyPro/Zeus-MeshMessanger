@@ -192,6 +192,23 @@ Insert yours first and the test fails with "Fixture expects grandfathered
 community versions without source", which tells you nothing about the real
 problem. The catalog's own tooling refers to a new listing as `plugins[-1]`.
 
+**Inside the entry, PREPEND the new version.** The opposite of the rule above, and
+both are enforced: a new *feature* goes last in `plugins`, a new *version* goes first
+in that entry's `versions` array. `validate-community-submission.ps1` throws "A
+release PR must prepend exactly one new immutable version" unless
+`versions[0].version` is the new one. **Nothing local catches this**, which is the
+part worth remembering: `validate-registry.ps1` only reads your file, and
+`test-community-custody.ps1` uses your file as the *base* of its own fixture
+submission, so it never compares your edit against main. The comparison runs in that
+direction only in the "Trusted community submission policy" job on the pull request.
+Run it yourself before pushing:
+
+```powershell
+git show upstream/main:registry.json > ..\base-registry.json
+pwsh tools/validate-community-submission.ps1 -BaseRegistryPath ..\base-registry.json `
+  -CandidateRegistryPath registry.json -ExpectedFeatureId <id> -ExpectedVersion <version>
+```
+
 **`downloadUrl` points at Zeus-SDR and will 404.** That is correct. Your own
 release URL goes in `source.package`. The HTTPS/checksum check downloads
 `downloadUrl` and therefore fails until a maintainer mirrors the package into

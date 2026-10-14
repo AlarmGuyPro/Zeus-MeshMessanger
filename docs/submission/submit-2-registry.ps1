@@ -111,14 +111,30 @@ Write-Host "  On branch $branch" -ForegroundColor Green
 $registryPath = Join-Path $clone 'registry.json'
 if (-not (Test-Path -LiteralPath $registryPath)) { Pop-Location; Fail 'registry.json is not in the clone.' }
 
-# A re-run has to start from the catalog's own registry.json, not from the copy a
-# previous attempt already edited. Nothing is committed until the end of this
-# script, so while the branch still points at the source remote's main the file can
-# simply be restored; once a commit exists, leave it alone and let the check below
-# explain itself.
-$head = (git rev-parse HEAD 2>$null | Select-Object -First 1)
-$sourceHead = (git rev-parse "$sourceRemote/main" 2>$null | Select-Object -First 1)
-if ($head -and $sourceHead -and "$head".Trim() -eq "$sourceHead".Trim()) {
+# A re-run has to start from the catalog's own registry.json rather than from the
+# copy a previous attempt already edited, whether that attempt committed or not.
+# The branch belongs to this script, so when everything on it is this script's own
+# commit it is rewound; when the file is merely dirty it is restored. Anything else
+# on the branch is left alone, and the check below explains itself.
+$rewound = $false
+$head = "$(git rev-parse HEAD 2>$null | Select-Object -First 1)".Trim()
+$sourceHead = "$(git rev-parse "$sourceRemote/main" 2>$null | Select-Object -First 1)".Trim()
+$commitMessage = "feat(registry): add $FeatureId $Version"
+
+if ($head -and $sourceHead -and $head -ne $sourceHead) {
+    $subjects = @(git log --format=%s "$sourceRemote/main..HEAD" 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    $foreign = @($subjects | Where-Object { $_ -cne $commitMessage })
+    # Nothing but registry.json may be dirty, so a rewind cannot discard other work.
+    $dirty = @(git status --porcelain 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    $dirtyElsewhere = @($dirty | Where-Object { $_ -notmatch 'registry\.json$' })
+    if ($subjects.Count -gt 0 -and $foreign.Count -eq 0 -and $dirtyElsewhere.Count -eq 0) {
+        git reset --hard "$sourceRemote/main" 2>&1 | Write-Host
+        if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "Could not rewind $branch to $sourceRemote/main." }
+        $rewound = $true
+        Write-Host "  Rewound $branch to $sourceRemote/main — it carried only this script's own commit." -ForegroundColor Yellow
+    }
+}
+elseif ($head -and $sourceHead) {
     git restore --source "$sourceRemote/main" -- registry.json 2>&1 | Write-Host
     if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'Could not restore registry.json from the source remote.' }
     Write-Host "  registry.json restored from $sourceRemote/main before editing."
@@ -157,31 +173,34 @@ To start the branch over instead, delete it and run this script again:
     }
 }
 
-# The anchor is the end of this feature's own 'versions' array: the last
-# source.package line belonging to it, then the three closing lines. Anchoring on
-# the feature's package URL keeps the edit inside the right entry.
-$anchor = @"
-            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/$FeatureId-0.4.1.zip"
-          }
-        }
-      ]
-"@ -replace "`r`n", "`n"
+# The new version goes at the FRONT of this feature's 'versions' array, and that is
+# a rule rather than a preference: tools/validate-community-submission.ps1 throws
+# "A release PR must prepend exactly one new immutable version" unless
+# versions[0].version is the new one. Appending it after 0.4.1 passes every local
+# gate — including the custody test, which only ever uses your registry.json as the
+# BASE of its own fixture submission and so never checks this — and then fails the
+# "Trusted community submission policy" check on the pull request, which is the only
+# place the comparison runs in the direction that matters.
+#
+# So the insertion point is the line after this feature's '"versions": [', found by
+# starting from the feature's own id so it cannot land in another entry.
+$idPos = $registry.IndexOf("`"id`": `"$FeatureId`"", [StringComparison]::Ordinal)
+$versionsPos = if ($idPos -ge 0) { $registry.IndexOf("`"versions`": [", $idPos, [StringComparison]::Ordinal) } else { -1 }
+$lineEnd = if ($versionsPos -ge 0) { $registry.IndexOf("`n", $versionsPos) } else { -1 }
 
-if (([regex]::Matches($registry, [regex]::Escape($anchor))).Count -ne 1) {
+if ($lineEnd -lt 0) {
     Pop-Location
     Fail @"
-Could not find the end of this feature's versions array in registry.json.
+Could not find the start of this feature's versions array in registry.json.
 
-Add the new version by hand instead, from REGISTRY-ENTRY.json: append it to the
-'versions' array of the io.github.alarmguypro.meshmessenger entry, after the
-0.4.1 object, and change nothing else. registry-1.0.3.patch shows the exact edit.
+Add the new version by hand instead, from REGISTRY-ENTRY.json: insert it as the
+FIRST element of the 'versions' array of the io.github.alarmguypro.meshmessenger
+entry, before the 0.4.1 object, and change nothing else. registry-$Version.patch
+shows the exact edit.
 "@
 }
 
 $addition = @"
-            "package": "https://github.com/AlarmGuyPro/Zeus-MeshMessanger/releases/download/v0.4.1/$FeatureId-0.4.1.zip"
-          }
-        },
         {
           "version": "$Version",
           "sdkAbi": 1,
@@ -196,11 +215,13 @@ $addition = @"
             "commit": "$Commit",
             "package": "$intake"
           }
-        }
-      ]
+        },
+
 "@ -replace "`r`n", "`n"
 
-$updated = $registry.Replace($anchor, $addition)
+# The here-string ends with a newline, so the 0.4.1 object that follows keeps its
+# own line. $lineEnd + 1 is the character after the newline of '"versions": ['.
+$updated = $registry.Insert($lineEnd + 1, $addition)
 
 # Two minutes back, on purpose, and the reason is the custody test rather than
 # taste. tools/test-community-custody.ps1 builds its own fixture submission on top
@@ -225,6 +246,10 @@ if ($entry.Count -ne 1) { Pop-Location; Fail "Expected exactly one $FeatureId en
 $listed = @($entry[0].versions | ForEach-Object { [string]$_.version })
 if ($listed -notcontains '0.4.1') { Pop-Location; Fail 'The published 0.4.1 version disappeared. Nothing was written.' }
 if ($listed -notcontains $Version) { Pop-Location; Fail "$Version was not added. Nothing was written." }
+if ($listed[0] -cne $Version) {
+    Pop-Location
+    Fail "The new version has to be first in the versions array, and after the edit the order is $($listed -join ', '). Nothing was written."
+}
 Write-Host "  Versions for this feature after the edit: $($listed -join ', ')" -ForegroundColor Green
 
 Set-Content -LiteralPath $registryPath -Value $updated -NoNewline -Encoding utf8
@@ -232,6 +257,35 @@ Write-Host '  registry.json updated.' -ForegroundColor Green
 Write-Host "  generated set to $stamp"
 
 # --- validate --------------------------------------------------------------
+# First the check the pull request will actually run, in the direction it runs it:
+# main's registry.json as the base, ours as the candidate. This is the one the
+# "Trusted community submission policy" job performs, and nothing else here covers
+# it — validate-registry only reads our file, and the custody test uses our file as
+# the base of its own fixture. A wrong version order passes both and fails this.
+$submissionCheck = Join-Path $clone 'tools/validate-community-submission.ps1'
+if (Test-Path -LiteralPath $submissionCheck) {
+    Write-Host ''
+    Write-Host 'Running tools/validate-community-submission.ps1 against the catalog main ...'
+    $baseCopy = Join-Path ([IO.Path]::GetTempPath()) "zeus-base-registry-$([Guid]::NewGuid().ToString('N')).json"
+    $baseText = (git show "${sourceRemote}/main:registry.json" | Out-String)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($baseText)) {
+        Pop-Location
+        Fail "Could not read registry.json from $sourceRemote/main to compare against."
+    }
+    [IO.File]::WriteAllText($baseCopy, $baseText, [Text.UTF8Encoding]::new($false))
+    & pwsh -NoProfile -File $submissionCheck `
+        -BaseRegistryPath $baseCopy `
+        -CandidateRegistryPath $registryPath `
+        -ExpectedFeatureId $FeatureId `
+        -ExpectedVersion $Version
+    $submissionExit = $LASTEXITCODE
+    Remove-Item -LiteralPath $baseCopy -ErrorAction SilentlyContinue
+    if ($submissionExit -ne 0) {
+        Pop-Location
+        Fail 'The catalog submission policy rejected the change. Nothing has been committed; the message above says why.'
+    }
+}
+
 foreach ($script in 'tools/validate-registry.ps1', 'tools/test-community-custody.ps1') {
     $validator = Join-Path $clone $script
     if (-not (Test-Path -LiteralPath $validator)) { continue }
@@ -262,9 +316,12 @@ if (-not $Force) {
 }
 
 git add registry.json
-git commit -m "feat(registry): add $FeatureId $Version"
+git commit -m $commitMessage
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'The commit failed.' }
-git push -u origin $branch
+# A rewound branch needs the remote's copy replaced rather than added to, and
+# --force-with-lease refuses if anything arrived on it that this clone has not seen.
+if ($rewound) { git push --force-with-lease -u origin $branch }
+else { git push -u origin $branch }
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'The push failed.' }
 
 Pop-Location

@@ -32,14 +32,31 @@ on 14 October; the ZIP is reachable and its hash matches the table above.
 `submit-2-registry.ps1` appends the version to the existing catalog entry and
 refuses to proceed if the published 0.4.1 object does not survive its own edit.
 
-Its first run stopped at the custody test with "A listing PR must advance the
-generated timestamp". That was the script's own doing and is fixed: it stamped
-`generated` with the current second, and `test-community-custody.ps1` stamps its
-fixture the same way and demands its own be strictly later, so the two tied. The
-stamp is now set two minutes back, and the script restores `registry.json` from the
-source remote before editing so a re-run starts from the catalog's copy rather than
-its own. Both paths were tested against a clone of the catalog at
-`87c3d0f`. See section 8 of the playbook.
+The submission took two corrections, both in the script and both now fixed. They are
+worth reading before the next version goes out, because each one passed every local
+gate first. Section 8 of the playbook carries them.
+
+**The `generated` stamp tied with the custody test.** `test-community-custody.ps1`
+builds its own fixture submission on top of whatever `registry.json` is in the tree,
+stamps that fixture with `UtcNow` to the second, and demands its own be strictly
+later. The script stamped `registry.json` with `UtcNow` moments before, so the two
+tied and it failed with "A listing PR must advance the generated timestamp" — which
+reads as a complaint about the edit and is not one. The stamp is now two minutes
+back. It is environment-dependent, which is why the same edit passed in one clone
+and failed in another.
+
+**The new version has to be FIRST in the `versions` array.** The script appended it
+after 0.4.1. `validate-registry.ps1` passed, the custody test passed, and
+[PR #22](https://github.com/Zeus-SDR/zeus-community-features/pull/22) then failed the
+"Trusted community submission policy" check with "A release PR must prepend exactly
+one new immutable version". Nothing local covers it: `validate-registry` only reads
+our file, and the custody test uses our file as the *base* of its fixture, so neither
+ever compares our edit against the catalog's main. The script now prepends, refuses
+to write if the new version is not `versions[0]`, and runs
+`validate-community-submission.ps1` in the direction CI runs it before committing.
+
+Both fixes were tested against a clone of the catalog at `87c3d0f`, including a
+re-run over the branch as the first attempt left it.
 
 ## What 1.0 answered from the review
 

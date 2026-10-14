@@ -2,8 +2,12 @@
   "_comment": [
     "Mesh Messenger is ALREADY LISTED in the Zeus community catalog: PR #19 was merged and",
     "registry.json carries the entry io.github.alarmguypro.meshmessenger with version 0.4.1.",
-    "So 1.0.3 is a new element APPENDED to that entry's 'versions' array — not a new element",
-    "of 'plugins'. Leave the 0.4.1 object exactly as it is: the catalog's custody test rejects",
+    "So 1.0.3 is a new element of that entry's 'versions' array — not a new element of",
+    "'plugins' — and it goes FIRST, before the 0.4.1 object. That is enforced:",
+    "validate-community-submission.ps1 throws 'A release PR must prepend exactly one new",
+    "immutable version' unless versions[0] is the new one, and that check runs only on the",
+    "pull request, so appending passes every local gate and then fails CI.",
+    "Leave the 0.4.1 object exactly as it is: the catalog's custody test rejects",
     "any edit to a version it has already published.",
     "The exact edit is in registry-1.0.3.patch, and submit-2-registry.ps1 applies it.",
     "The object below is what to add, indented to the catalog's style (10 spaces at the brace)."
