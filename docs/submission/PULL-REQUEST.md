@@ -121,6 +121,44 @@ accurate.
   loaded rather than a constant in the code, so a bug report cannot quote a
   version nothing shipped with.
 
+## What a day of real use added
+
+0.4.1 went out and was used on a busy mesh, which found eight things the test
+suite never would. The two worth a reviewer's attention:
+
+**A panel error boundary.** A feature renders inside the host's React tree, so
+an exception during render unmounts whatever tree it reaches — a bug in a
+feature does not produce a broken panel, it takes the operator's window. Mesh
+Messenger now contains its own faults and shows the error with a button that
+copies the stack. I would suggest this belongs in the template.
+
+**And the fault that proved it.** Opening a second channel took the whole Zeus
+workspace down with `TypeError: d is not a function`, thrown from inside
+React's minified code. The cause was one missing pair of braces:
+
+```tsx
+useEffect(() => el?.scrollTo({ top: 0 }), [id]);   // returns whatever scrollTo returns
+```
+
+React keeps an effect's return value and calls it later as the cleanup.
+`scrollTo` returns undefined per the specification — and the Zeus webview ships
+a chainable scroll polyfill that returns the element, so React called a `<div>`.
+It reproduced on hardware every time and in a plain browser never.
+
+`tests/preview/regression.mjs` now renders the panel under simulated host
+quirks, including that one, and fails if the boundary ever appears. It fails
+without the fix.
+
+The rest, briefly: hashtag channel names are case-sensitive and the join form
+now warns before you join one that nobody else is on; the inbox reads newest
+first; clearing hundreds of contacts paces itself and reads the list back once
+instead of once per contact, which used to bury the node and drop the session;
+a full-list warning that fired even when the node was recycling; the firmware's
+packet-log push no longer floods the Logs tab; and the Nodes tab now explains
+when a node is adding stations by itself and lets the operator change it —
+written against the firmware source, which shows the per-kind bits are ignored
+unless the node is also made selective.
+
 ## Capabilities and permissions, and why
 
 Declared: `NetworkAccess`, `PersistSettings`. Permissions: `network: true`,
@@ -158,8 +196,9 @@ transmitter.
 | `tools/validate-registry.ps1` with this entry | 24 plugins, 43 versions, exit 0 |
 | `tools/test-community-custody.ps1` | passed |
 | `tools/test-catalog-publication.ps1` | passed |
-| Feature test suite | 48/48 |
+| Feature test suite | 55/55 |
 | `scripts/mutation-check.py` | all four mutations caught |
+| `tests/preview/regression.mjs` | clean under both host profiles |
 
 ## The 404 check, again
 
